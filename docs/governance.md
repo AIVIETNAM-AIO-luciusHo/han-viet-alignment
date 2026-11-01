@@ -15,8 +15,11 @@ Thành viên phụ trách phát triển và review chéo; leader kiểm tra tíc
 4. Sửa dữ liệu phải có nguồn đối chiếu và bản ghi hiệu đính; không sửa OCR thô.
 
 ## Cấu hình trên GitHub
-Các mục dưới đây là hướng dẫn; chưa được áp dụng trên GitHub bởi việc sửa repo local.
-Trước khi bật, xác minh handle leader là tài khoản người dùng có quyền write;
+Ngày 2026-11-02: đã áp dụng branch protection trên main qua GitHub API, không chỉ sửa file local.
+Bắt buộc PR, 1 approval, owner review, hủy approval cũ, giải quyết hội thoại và status scaffold;
+không cho force push hoặc xóa main. enforce_admins=false để leader/admin có ngoại lệ.
+Workflow CI mở rộng vẫn cần push/PR để xác nhận kết quả trên GitHub.
+Đã xác minh handle leader là tài khoản người dùng có quyền admin ngày 2026-11-02;
 nếu là tổ chức, thay bằng username cá nhân hoặc team hợp lệ dạng @org/team.
 Đảm bảo CODEOWNERS đã có trong nhánh đích của PR và GitHub không báo lỗi owner.
 

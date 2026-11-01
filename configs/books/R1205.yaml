@@ -1,0 +1,6 @@
+# Tra thông tin nguồn tương ứng trong metadata/books.json.
+book_id: R1205
+family_config: configs/minh_menh.yaml
+source_path: "docs-local/NLP-20261101T150232Z-1-001/NLP/Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 5_ocr.pdf"
+has_phien_am: false
+scope_status: pending_confirmation

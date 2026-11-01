@@ -1,0 +1,7 @@
+# Cấu hình nhóm sách, dự kiến kế thừa base.yaml khi có bộ nạp.
+books: [R1204, R1205, R1206]
+has_phien_am: false
+han_input: scan
+viet_input: pdf_text
+alignment_strategy: folio_then_semantics
+team: B

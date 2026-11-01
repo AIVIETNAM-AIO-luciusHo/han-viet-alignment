@@ -1,0 +1,6 @@
+# Tra thông tin nguồn tương ứng trong metadata/books.json.
+book_id: R1001
+family_config: configs/sac_phong.yaml
+source_path: "docs-local/NLP-20261101T150232Z-1-001/NLP/tap 1.pdf"
+has_phien_am: true
+scope_status: pending_confirmation

@@ -1,0 +1,67 @@
+[
+  {
+    "book_id": "R1001",
+    "title": "Sắc phong trên địa bàn tỉnh Hưng Yên – tập 1",
+    "source_path": "docs-local/NLP-20261101T150232Z-1-001/NLP/tap 1.pdf",
+    "listed_file": "10.1 - sac phong hung yen.pdf",
+    "pdf_pages": 178,
+    "family": "sac_phong",
+    "has_phien_am": true,
+    "han_input": "scan",
+    "viet_input": "scan",
+    "quota_class": "requires_ocr",
+    "scope_status": "pending_confirmation"
+  },
+  {
+    "book_id": "R1003",
+    "title": "Sắc phong trên địa bàn tỉnh Hưng Yên – tập 3",
+    "source_path": "docs-local/NLP-20261101T150232Z-1-001/NLP/tap 3.pdf",
+    "listed_file": "10.3 - sac phong hung yen.pdf",
+    "pdf_pages": 252,
+    "family": "sac_phong",
+    "has_phien_am": true,
+    "han_input": "scan",
+    "viet_input": "scan",
+    "quota_class": "requires_ocr",
+    "scope_status": "pending_confirmation"
+  },
+  {
+    "book_id": "R1204",
+    "title": "Minh Mệnh chính yếu – tập 4",
+    "source_path": "docs-local/NLP-20261101T150232Z-1-001/NLP/Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 4_ocr.pdf",
+    "listed_file": "Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 4_ocr.pdf",
+    "pdf_pages": 516,
+    "family": "minh_menh",
+    "has_phien_am": false,
+    "han_input": "scan",
+    "viet_input": "pdf_text",
+    "quota_class": "requires_ocr",
+    "scope_status": "pending_confirmation"
+  },
+  {
+    "book_id": "R1205",
+    "title": "Minh Mệnh chính yếu – tập 5",
+    "source_path": "docs-local/NLP-20261101T150232Z-1-001/NLP/Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 5_ocr.pdf",
+    "listed_file": "Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 5_ocr.pdf",
+    "pdf_pages": 566,
+    "family": "minh_menh",
+    "has_phien_am": false,
+    "han_input": "scan",
+    "viet_input": "pdf_text",
+    "quota_class": "requires_ocr",
+    "scope_status": "pending_confirmation"
+  },
+  {
+    "book_id": "R1206",
+    "title": "Minh Mệnh chính yếu – tập 6",
+    "source_path": "docs-local/NLP-20261101T150232Z-1-001/NLP/Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 6_ocr.pdf",
+    "listed_file": "Minh Mệnh Chính Yếu/Minh Mệnh chính yếu tập 6_ocr.pdf",
+    "pdf_pages": 736,
+    "family": "minh_menh",
+    "has_phien_am": false,
+    "han_input": "scan",
+    "viet_input": "pdf_text",
+    "quota_class": "requires_ocr",
+    "scope_status": "pending_confirmation"
+  }
+]

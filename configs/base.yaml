@@ -1,0 +1,14 @@
+# Đặc tả cấu hình dự kiến; chưa có bộ nạp hoặc pipeline sử dụng.
+workspace: workspace
+metadata: metadata
+execution:
+  preference: local
+  device: auto  # Cần đo GPU/VRAM trước khi chọn mô hình.
+  ocr_backend: null
+  external_services_enabled: false
+quality:
+  max_alignment_error_rate: 0.30
+  target_alignment_error_rate: 0.20
+  min_reading_match_rate: 0.95
+  minimum_valid_pairs_per_member: 2000
+  minimum_valid_pairs_group: 8000

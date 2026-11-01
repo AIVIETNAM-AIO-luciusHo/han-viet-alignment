@@ -1,0 +1,7 @@
+# Cấu hình nhóm sách, dự kiến kế thừa base.yaml khi có bộ nạp.
+books: [R1001, R1003]
+has_phien_am: true
+han_input: scan
+viet_input: scan
+alignment_strategy: via_phien_am
+team: A

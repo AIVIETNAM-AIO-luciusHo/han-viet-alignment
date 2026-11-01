@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-local sources and generated data
+/docs-local/
+/workspace/
+*:Zone.Identifier

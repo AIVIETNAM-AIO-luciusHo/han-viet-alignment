@@ -1,0 +1,48 @@
+{
+  "deadline": null,
+  "team_split_status": "confirmed",
+  "members": [
+    {
+      "github": "ahihitoanne",
+      "name": "Phạm Đức Toàn",
+      "role": "member",
+      "team": "A"
+    },
+    {
+      "github": "TrongKiennn",
+      "name": null,
+      "role": "member",
+      "team": "A"
+    },
+    {
+      "github": "vmq-16",
+      "name": "Minh Mẫn (cần xác nhận tên đầy đủ)",
+      "role": "member",
+      "team": "B"
+    },
+    {
+      "github": "AIVIETNAM-AIO-luciusHo",
+      "name": "luluciusHo (cần xác nhận tên đầy đủ)",
+      "role": "leader",
+      "team": "B"
+    }
+  ],
+  "student_ids_status": "pending",
+  "emails_status": "pending",
+  "leader_handle_access_status": "pending_github_verification",
+  "teams": {
+    "A": {
+      "books": [
+        "R1001",
+        "R1003"
+      ]
+    },
+    "B": {
+      "books": [
+        "R1204",
+        "R1205",
+        "R1206"
+      ]
+    }
+  }
+}

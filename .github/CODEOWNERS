@@ -1,0 +1,27 @@
+# Repository owner / Leader
+* @AIVIETNAM-AIO-luciusHo
+
+# Team A - Sac phong
+/src/sac_phong/ @ahihitoanne @TrongKiennn
+/tests/sac_phong/ @ahihitoanne @TrongKiennn
+/configs/sac_phong.yaml @ahihitoanne @TrongKiennn
+
+# Team B - Minh Menh
+/src/minh_menh/ @vmq-16 @AIVIETNAM-AIO-luciusHo
+/tests/minh_menh/ @vmq-16 @AIVIETNAM-AIO-luciusHo
+/configs/minh_menh.yaml @vmq-16 @AIVIETNAM-AIO-luciusHo
+
+# Shared architecture - Leader
+/src/common/ @AIVIETNAM-AIO-luciusHo
+/src/alignment/ @AIVIETNAM-AIO-luciusHo
+/src/validation/ @AIVIETNAM-AIO-luciusHo
+/src/export/ @AIVIETNAM-AIO-luciusHo
+/scripts/ @AIVIETNAM-AIO-luciusHo
+/tests/integration/ @AIVIETNAM-AIO-luciusHo
+/configs/base.yaml @AIVIETNAM-AIO-luciusHo
+
+# Governance - Leader
+/.github/ @AIVIETNAM-AIO-luciusHo
+/docs/ @AIVIETNAM-AIO-luciusHo
+/pyproject.toml @AIVIETNAM-AIO-luciusHo
+/.gitignore @AIVIETNAM-AIO-luciusHo

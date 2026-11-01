@@ -58,3 +58,8 @@ Giữ PDF gốc nguyên vẹn; sửa ảnh phải có `<MA_SACH>_updated.pdf` v�
 ```
 Không dùng cây repo phát triển thay cây bàn giao. Chỉ tạo gói sau khi kiểm tra đầy đủ
 nguồn, độ phủ, hiệu đính, chất lượng và thông tin thành viên.
+
+## Thiết kế trung gian đang review
+[Contract F01](../specs/001-shared-data-contract/contracts/intermediate.md) là PROPOSED,
+chưa thay đổi định dạng bàn giao hoặc các bảng metadata hiện có. Việc biểu diễn
+phien_am.txt khi sách không có phiên âm là NEEDS_CONFIRMATION với người giao sách.

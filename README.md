@@ -67,11 +67,17 @@ han-viet-alignment/
 ```
 --
 ## Cộng tác
-Thành viên đã cung cấp: @ahihitoanne (Phạm Đức Toàn), @TrongKiennn,
-@vmq-16 (Minh Mẫn), leader @AIVIETNAM-AIO-luciusHo (luluciusHo; quyền GitHub chưa kiểm chứng).
+Thành viên đã cung cấp: @ahihitoanne (Phạm Đức Toàn), @TrongKiennn (Mạnh Trọng Kiên),
+@vmq-16 (Vũ Minh Quang), leader @AIVIETNAM-AIO-luciusHo (Hồ Văn Lực; quyền GitHub chưa kiểm chứng).
 Team A: @ahihitoanne và @TrongKiennn phụ trách R1001/R1003.
 Team B: @vmq-16 và leader phụ trách R1204/R1205/R1206.
 Hạn nộp, thông tin báo cáo và phân công từng văn bản chưa chốt. Xem metadata/team.json.
 Leader là CODEOWNER toàn repo; quy trình review và bảo vệ nhánh trong [governance](docs/governance.md).
 PR phải nêu phạm vi và cách kiểm tra; không thêm dữ liệu lớn hoặc bí mật.
 CI hiện chỉ kiểm tra khung, không xác nhận chất lượng dóng hàng.
+
+## Đặc tả đang review
+- [Constitution dự thảo](.specify/memory/constitution.md) — PROPOSED, chưa phê chuẩn.
+- [F01: hợp đồng chung](specs/001-shared-data-contract/spec.md) và [contract trung gian](specs/001-shared-data-contract/contracts/intermediate.md).
+Chưa khởi tạo Spec Kit CLI/integration; các tài liệu trên được soạn trước để review.
+Chưa triển khai F01 hoặc pipeline. Điểm cần chốt nằm trong bảng NC01–NC08 của spec.

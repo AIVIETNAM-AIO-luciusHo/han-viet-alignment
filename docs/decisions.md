@@ -8,7 +8,7 @@ Ngày 2026-11-01, theo khảo sát của leader:
 - Dữ liệu lớn/OCR/ảnh/kết quả chạy nằm local; metadata nhỏ và tài liệu quy ước được commit.
 - Chỉ metadata mẫu và cấu hình dự kiến; chưa có cơ chế kế thừa YAML hoặc runner.
 
-Cần bổ sung sau: hạn nộp; họ tên đầy đủ/MSSV/email; phân công từng doc_id; GPU/VRAM/RAM/OS; OCR backend và quyền dùng dịch vụ.
+Cần bổ sung sau: hạn nộp; MSSV/email; phân công từng doc_id; GPU/VRAM/RAM/OS; OCR backend và quyền dùng dịch vụ.
 Leader cung cấp handle @AIVIETNAM-AIO-luciusHo cho CODEOWNERS; chưa kiểm chứng loại tài khoản/quyền trên GitHub.
 Đã chốt A: ahihitoanne/TrongKiennn, B: vmq-16/leader.
 Leader là owner duy nhất toàn repo; xem docs/governance.md cho chính sách PR và ngoại lệ PR của leader.
@@ -16,3 +16,10 @@ Leader là owner duy nhất toàn repo; xem docs/governance.md cho chính sách 
 Trước khi triển khai: kiểm kê nguồn và thử vài văn bản đại diện cả hai nhóm sách,
 đo tốc độ/VRAM/độ chính xác, rồi cố định dependency và phiên bản model.
 Nếu đề xuất phương pháp mới: ghi lý do, input/output, kiểm chứng, rủi ro/dự phòng và tái lập.
+
+## Đợt chuẩn bị F01 — 2026-11-01
+CONFIRMED: cập nhật họ tên theo leader; giữ package hiện tại; chỉ viết tài liệu đặc tả.
+CONFIRMED: leader yêu cầu sửa CODEOWNERS để phụ trách toàn repo; file local dùng một rule *.
+PROPOSED: constitution draft và F01 tại .specify/memory/ và specs/001-shared-data-contract/.
+NEEDS_CONFIRMATION: các quyết định NC01–NC08 trong F01; chưa phê chuẩn thiết kế trung gian.
+Chưa cài/khởi tạo Spec Kit integration, viết pipeline, push, merge hoặc thay rulesets.

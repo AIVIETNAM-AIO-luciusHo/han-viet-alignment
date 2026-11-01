@@ -1,8 +1,14 @@
-# han-viet-alignment
+## han-viet-alignment
 Xây dựng dữ liệu dóng hàng Hán–Việt từ sắc phong Hưng Yên tập 1/3 và Minh Mệnh chính yếu tập 4/5/6.
+--
+## Thành viên nhóm 
+ Họ và tên | MSSV | Email sinh viên |
+| --- | --- | --- | 
+| **Hồ Văn Lực** | `24120374` | 24120374@student.hcmus.edu.vn | 
+| **Vũ Minh Quang** | `24120128` | 24120128@student.hcmus.edu.vn |
+| **Mạnh Trọng Kiên** | `22120167` | 22120167@student.hcmus.edu.vn | 
+| **Phạm Đức Toàn** | `24120467` | 24120467@student.hcmus.edu.vn | 
 
-**Trạng thái: khung dự án và hợp đồng dữ liệu. Chưa có pipeline OCR/dóng hàng hoặc sản phẩm nộp.**
-Nhóm bốn thành viên; ưu tiên GPU laptop và công cụ miễn phí, OCR backend chưa chốt.
 
 ## Bắt đầu
 ```sh
@@ -33,7 +39,33 @@ Cả năm tập thuộc loại cần OCR. Chỉ tiêu nhóm: 8.000 cặp hợp l
 Tài liệu hành chính thay phần bàn giao/đánh giá của quy định chung.
 Giữ bản dịch sách, không dịch bù; OCR thô tách text sạch; truy vết theo doc_id.
 Cấu trúc bàn giao 01_nguon–04_dong_hang được tạo riêng khi triển khai export.
-
+--
+## Directory tree
+```text
+han-viet-alignment/
+├── .github/                    # CODEOWNERS, CI, mẫu PR
+├── configs/                    # Cấu hình chung, hai nhóm sách và năm mã sách
+├── src/han_viet_alignment/
+│   ├── common/                 # Kiểu dữ liệu, ID, tiện ích dùng chung
+│   ├── inventory/              # Kiểm kê nguồn
+│   ├── extraction/             # Trích xuất PDF/OCR
+│   ├── sac_phong/              # Pipeline Team A
+│   ├── minh_menh/              # Pipeline Team B
+│   ├── alignment/              # Dóng hàng câu
+│   ├── review/                 # Hiệu đính và truy vết
+│   ├── validation/             # Kiểm tra dữ liệu
+│   └── export/                 # Tạo cấu trúc nộp bài
+├── scripts/                    # Hiện có kiểm tra scaffold; runner sẽ thêm sau
+├── tests/                      # Kiểm thử và fixtures nhỏ
+├── docs/                       # Yêu cầu, contract, quyết định, pilot
+├── metadata/
+│   └── team.json               # Thành viên, MSSV, GitHub, nhóm
+├── docs-local/                 # PDF/từ điển local, KHÔNG commit
+├── workspace/                  # Dữ liệu xử lý/xuất local, KHÔNG commit
+├── USER_GUIDE.md
+└── README.md
+```
+--
 ## Cộng tác
 Thành viên đã cung cấp: @ahihitoanne (Phạm Đức Toàn), @TrongKiennn,
 @vmq-16 (Minh Mẫn), leader @AIVIETNAM-AIO-luciusHo (luluciusHo; quyền GitHub chưa kiểm chứng).

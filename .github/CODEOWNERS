@@ -1,20 +1,50 @@
-# Leader owns all paths, including this file and future Spec Kit artifacts.
-# GitHub must recognize this handle as a user with write access.
+
+
+# Han-Viet Alignment - CODEOWNERS
+
+
+# Default: Leader
 * @AIVIETNAM-AIO-luciusHo
 
-# Professional assignments (comments do not override leader ownership):
-# Team A: @ahihitoanne @TrongKiennn
-#   /src/han_viet_alignment/sac_phong/
-#   /tests/sac_phong/
-#   /configs/sac_phong.yaml
-#   /configs/books/R1001.yaml /configs/books/R1003.yaml
-# Team B: @vmq-16 @AIVIETNAM-AIO-luciusHo
-#   /src/han_viet_alignment/minh_menh/
-#   /tests/minh_menh/
-#   /configs/minh_menh.yaml
-#   /configs/books/R1204.yaml /configs/books/R1205.yaml /configs/books/R1206.yaml
 
-# Shared architecture, metadata, docs, specs and .github remain leader-owned.
-# A later matching active rule replaces ownership; multiple owners allow
-# approval from any one owner, not mandatory approval from every owner.
-# CODEOWNERS does not enable branch protection. See docs/governance.md.
+# Team A - Sac phong (R1001, R1003)
+
+
+/src/han_viet_alignment/sac_phong/ @ahihitoanne @TrongKiennn
+/tests/sac_phong/ @ahihitoanne @TrongKiennn
+/configs/sac_phong.yaml @ahihitoanne @TrongKiennn
+/configs/books/R1001.yaml @ahihitoanne @TrongKiennn
+/configs/books/R1003.yaml @ahihitoanne @TrongKiennn
+
+
+# Team B - Minh Menh (R1204, R1205, R1206)
+
+/src/han_viet_alignment/minh_menh/ @vmq-16 @AIVIETNAM-AIO-luciusHo
+/tests/minh_menh/ @vmq-16 @AIVIETNAM-AIO-luciusHo
+/configs/minh_menh.yaml @vmq-16 @AIVIETNAM-AIO-luciusHo
+/configs/books/R1204.yaml @vmq-16 @AIVIETNAM-AIO-luciusHo
+/configs/books/R1205.yaml @vmq-16 @AIVIETNAM-AIO-luciusHo
+/configs/books/R1206.yaml @vmq-16 @AIVIETNAM-AIO-luciusHo
+
+
+# Shared architecture - Leader
+
+/src/han_viet_alignment/common/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/alignment/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/review/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/validation/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/export/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/inventory/ @AIVIETNAM-AIO-luciusHo
+/src/han_viet_alignment/extraction/ @AIVIETNAM-AIO-luciusHo
+
+
+# Project governance - Leader
+
+
+/.github/ @AIVIETNAM-AIO-luciusHo
+/docs/ @AIVIETNAM-AIO-luciusHo
+/specs/ @AIVIETNAM-AIO-luciusHo
+/metadata/ @AIVIETNAM-AIO-luciusHo
+/scripts/ @AIVIETNAM-AIO-luciusHo
+/pyproject.toml @AIVIETNAM-AIO-luciusHo
+/README.md @AIVIETNAM-AIO-luciusHo

@@ -37,3 +37,26 @@ chưa đưa hai thư viện vào runtime vì chưa triển khai bước đó.
 Khi tích hợp cần cố định phiên bản và bổ sung kiểm tra: mã/ID, phiên âm theo sách,
 XLSX không công thức/gộp ô, độ phủ, ngưỡng chất lượng. Mã thoát 0 của script gốc
 không tự xác nhận mọi tiêu chí nghiệm thu.
+
+## Quy ước đường dẫn
+[Cây thư mục trong README](README.md#cây-thư-mục-hiện-tại) mô tả repo thực tế.
+Code thuộc src/han_viet_alignment/, không dùng src/sac_phong/ hoặc src/minh_menh/.
+Tên thư mục tests/sac_phong/ và tests/minh_menh/ là đúng vì tests nhóm theo chức năng.
+Không đổi tên tài liệu gốc trong docs-local để ép theo quy ước tên module.
+workspace/ được tạo local khi cần; Git không lưu thư mục rỗng hoặc dữ liệu đã ignore.
+
+
+## Kiểm tra trước khi mở PR
+Không cần Claude, Codex hoặc Spec Kit CLI. Cần Python ≥3.11:
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-ci.txt
+.venv/bin/python scripts/check_scaffold.py
+.venv/bin/python scripts/check_project.py
+.venv/bin/python -m unittest discover -s tests/common -p 'test_*.py' -v
+```
+Windows dùng .venv/Scripts/python.exe.
+Mở PR vào main, xem mục Checks và xử lý lỗi; nếu GitHub báo merge conflict,
+cập nhật nhánh và giải quyết xung đột. Nhờ leader review trước khi merge.
+CI hiện kiểm tra khung/cấu hình, chưa kiểm tra chất lượng pipeline OCR/dóng hàng.
+Công cụ AI cá nhân của leader không phải yêu cầu cài đặt của thành viên.

@@ -79,10 +79,11 @@ def parse_page_range(pages_str: str, max_pages: int):
 def main():
     parser = argparse.ArgumentParser(description="Pipeline trích xuất PDF & tạo dữ liệu OCR thô (02_ocr_tho) Sắc phong R1001 / R1003")
     parser.add_argument("--pdf", default="tap 1.pdf", help="Đường dẫn file PDF sách (mặc định: 'tap 1.pdf')")
-    parser.add_argument("--pages", default="4-7", help="Dải trang cần chạy, ví dụ '4-7' hoặc 'all' (mặc định: '4-7')")
+    parser.add_argument("--pages", default="4-178", help="Dải trang cần chạy, ví dụ '4-7' hoặc '4-178' (mặc định: '4-178')")
     parser.add_argument("--ma-sach", default=None, help="Mã sách quy định (mặc định: 'R1001' cho tập 1, 'R1003' cho tập 3)")
     parser.add_argument("--out-dir", default=None, help="Thư mục xuất kết quả (mặc định: ./<ma-sach>)")
     parser.add_argument("--cache-dir", default="cache_pages", help="Thư mục tạm lưu ảnh trang PDF")
+    parser.add_argument("--force", action="store_true", default=False, help="Chạy lại từ đầu, ghi đè toàn bộ các văn bản cũ")
     
     args = parser.parse_args()
     
@@ -169,40 +170,77 @@ def main():
     
     for i, doc in enumerate(all_docs):
         doc_id = doc["doc_id"]
-        print(f"  -> [{i+1}/{len(all_docs)}] Đang OCR văn bản {doc_id} (Trang {doc['page_num']})...")
+        meta_file = out_viet_dir / f"{doc_id}_meta.json"
+        han_file = out_han_dir / f"{doc_id}.txt"
+        viet_file = out_viet_dir / f"{doc_id}.txt"
         
-        # OCR Tiếng Việt (Phiên âm + Dịch nghĩa)
         viet_img_rel = f"viet/{doc_id}_1.jpg"
-        full_vi_txt, pa_txt, dn_txt, vi_boxes = process_viet_ocr(doc["viet_img"], doc_id)
-        
-        # Lưu file thô tiếng Việt (giữ nguyên số trang và footnote)
-        (out_viet_dir / f"{doc_id}.txt").write_text(full_vi_txt, encoding="utf-8")
+        han_img_rel = f"han/{doc_id}_1.jpg"
+
+        if not args.force and meta_file.exists() and han_file.exists() and viet_file.exists():
+            print(f"  -> [{i+1}/{len(all_docs)}] Đã có sẵn dữ liệu OCR cho {doc_id} (Trang {doc['page_num']}) -> Tái sử dụng.")
+            try:
+                mdata = json.loads(meta_file.read_text(encoding="utf-8"))
+                corr_han_txt = han_file.read_text(encoding="utf-8")
+                pa_txt = mdata.get("pa", "")
+                dn_txt = mdata.get("dn", "")
+                vi_boxes = mdata.get("vi_boxes", [])
+                han_boxes = mdata.get("han_boxes", [])
+            except Exception:
+                # Nếu file lỗi thì chạy lại OCR
+                corr_han_txt = None
+        else:
+            corr_han_txt = None
+
+        if corr_han_txt is None:
+            print(f"  -> [{i+1}/{len(all_docs)}] Đang OCR văn bản {doc_id} (Trang {doc['page_num']})...")
+            # OCR Tiếng Việt (Phiên âm + Dịch nghĩa)
+            full_vi_txt, pa_txt, dn_txt, vi_boxes = process_viet_ocr(doc["viet_img"], doc_id)
+            
+            # Lưu file thô tiếng Việt (giữ nguyên số trang và footnote)
+            viet_file.write_text(full_vi_txt, encoding="utf-8")
+            
+            # OCR Chữ Hán
+            han_txt, han_boxes = process_han_ocr(doc["han_img"], doc_id)
+            
+            # Tự động sửa lỗi chữ Hán (Auto-Correction) kết hợp Phiên âm và Từ điển Hán Nôm
+            corr_han_txt, details = corrector.correct_han(han_txt, pa_txt)
+            n_ok = sum(1 for d in details if syl_key(d['syllable']) in corrector.han_readings.get(d['char'], ()))
+            acc = (n_ok / len(details) * 100) if details else 0
+            print(f"      [Auto-Correction] Chữ Hán khớp âm từ điển: {n_ok}/{len(details)} ({acc:.1f}%)")
+            
+            # Lưu file chữ Hán đã sửa chuẩn xác vào 02_ocr_tho/han/<doc_id>.txt
+            han_file.write_text(corr_han_txt, encoding="utf-8")
+            
+            # Lưu meta cache để resume
+            meta_file.write_text(json.dumps({
+                "pa": pa_txt,
+                "dn": dn_txt,
+                "vi_boxes": vi_boxes,
+                "han_boxes": han_boxes
+            }, ensure_ascii=False), encoding="utf-8")
         
         # Ghi Label.txt theo format: <folder>/<image>\t<json_boxes>
         viet_label_lines.append(f"{viet_img_rel}\t{json.dumps(vi_boxes, ensure_ascii=False)}")
         viet_filestate_lines.append(f"{viet_img_rel}\t1")
-        
-        # OCR Chữ Hán
-        han_img_rel = f"han/{doc_id}_1.jpg"
-        han_txt, han_boxes = process_han_ocr(doc["han_img"], doc_id)
-        
-        # Tự động sửa lỗi chữ Hán (Auto-Correction) kết hợp Phiên âm và Từ điển Hán Nôm
-        corr_han_txt, details = corrector.correct_han(han_txt, pa_txt)
-        n_ok = sum(1 for d in details if syl_key(d['syllable']) in corrector.han_readings.get(d['char'], ()))
-        acc = (n_ok / len(details) * 100) if details else 0
-        print(f"      [Auto-Correction] Chữ Hán khớp âm từ điển: {n_ok}/{len(details)} ({acc:.1f}%)")
-        
-        # Lưu file chữ Hán đã sửa chuẩn xác vào 02_ocr_tho/han/<doc_id>.txt
-        (out_han_dir / f"{doc_id}.txt").write_text(corr_han_txt, encoding="utf-8")
         han_label_lines.append(f"{han_img_rel}\t{json.dumps(han_boxes, ensure_ascii=False)}")
         han_filestate_lines.append(f"{han_img_rel}\t1")
         
         # Tích lũy cho 03_text_sach/ (Chữ Hán chuẩn hóa phục vụ dóng hàng)
         text_sach_han.append(f"### {doc_id}\n{corr_han_txt}\n")
         text_sach_pa.append(f"### {doc_id}\n{pa_txt}\n")
-        # Nếu sách gốc không có bản dịch thì ghi rõ để Người 2 dóng hàng chuẩn quy định
         dn_final = dn_txt if dn_txt.strip() else "[Sách gốc không có bản dịch]"
         text_sach_dn.append(f"### {doc_id}\n{dn_final}\n")
+        
+        # Ghi file định kỳ sau mỗi 10 văn bản hoặc văn bản cuối cùng để chống mất dữ liệu
+        if (i + 1) % 10 == 0 or (i + 1) == len(all_docs):
+            (out_viet_dir / "Label.txt").write_text("\n".join(viet_label_lines) + "\n", encoding="utf-8")
+            (out_viet_dir / "fileState.txt").write_text("\n".join(viet_filestate_lines) + "\n", encoding="utf-8")
+            (out_han_dir / "Label.txt").write_text("\n".join(han_label_lines) + "\n", encoding="utf-8")
+            (out_han_dir / "fileState.txt").write_text("\n".join(han_filestate_lines) + "\n", encoding="utf-8")
+            (out_text_dir / "han.txt").write_text("\n".join(text_sach_han) + "\n", encoding="utf-8")
+            (out_text_dir / "phien_am.txt").write_text("\n".join(text_sach_pa) + "\n", encoding="utf-8")
+            (out_text_dir / "dich_nghia.txt").write_text("\n".join(text_sach_dn) + "\n", encoding="utf-8")
         
     # Ghi file Label.txt, fileState.txt và 03_text_sach (tự động append nếu chạy theo từng cụm trang)
     def append_or_write(filepath, new_lines):

@@ -1,3 +1,6 @@
+# Test output
+test_10pages/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -232,3 +235,14 @@ __marimo__/
 
 # Leader-local tooling notes
 /docs/tooling.md
+
+# Data and local binary ignores
+*.pdf
+models/
+cache_pages/
+guideline/
+vietocr_configs/
+S113PH/
+R1001/
+R1003/
+Minh Mệnh Chính Yếu/

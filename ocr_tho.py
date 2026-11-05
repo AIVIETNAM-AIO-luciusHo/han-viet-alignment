@@ -116,9 +116,12 @@ def main():
         out_text_dir = out_dir / "03_text_sach"
         out_text_dir.mkdir(parents=True, exist_ok=True)
         
-        meta_files = sorted(out_viet_dir.glob("*_meta.json"), key=lambda p: p.stem)
+        meta_dir = cache_dir / "meta"
+        meta_files = sorted(meta_dir.glob("*_meta.json"), key=lambda p: p.stem) if meta_dir.exists() else []
         if not meta_files:
-            print(f"[!] Không tìm thấy dữ liệu OCR trong {out_viet_dir}")
+            meta_files = sorted(out_viet_dir.glob("*_meta.json"), key=lambda p: p.stem)
+        if not meta_files:
+            print(f"[!] Không tìm thấy dữ liệu OCR trong {meta_dir} hoặc {out_viet_dir}")
             return
             
         th_lines, tpa_lines, tdn_lines = [], [], []
@@ -228,7 +231,12 @@ def main():
     
     for i, doc in enumerate(all_docs):
         doc_id = doc["doc_id"]
-        meta_file = out_viet_dir / f"{doc_id}_meta.json"
+        meta_dir = cache_dir / "meta"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        meta_file = meta_dir / f"{doc_id}_meta.json"
+        legacy_meta = out_viet_dir / f"{doc_id}_meta.json"
+        if not meta_file.exists() and legacy_meta.exists():
+            meta_file = legacy_meta
         han_file = out_han_dir / f"{doc_id}.txt"
         viet_file = out_viet_dir / f"{doc_id}.txt"
         

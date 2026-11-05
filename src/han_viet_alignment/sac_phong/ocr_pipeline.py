@@ -18,7 +18,6 @@ from pathlib import Path
 from PIL import Image
 
 from rapidocr_onnxruntime import RapidOCR
-from opencc import OpenCC
 from vietocr.tool.config import Cfg
 from vietocr.tool.predictor import Predictor
 
@@ -26,13 +25,6 @@ from vietocr.tool.predictor import Predictor
 _rapid_han = None
 _rapid_det = None
 _vietocr_predictor = None
-_opencc_s2t = None
-
-def get_opencc():
-    global _opencc_s2t
-    if _opencc_s2t is None:
-        _opencc_s2t = OpenCC("s2t")
-    return _opencc_s2t
 
 def get_han_engine():
     global _rapid_han
@@ -379,7 +371,7 @@ def process_han_ocr(han_img_path: str, doc_id: str):
        giúp DBNet bắt trọn 100% từng cột từ trên xuống dưới mà không bị xé vụn.
     2. Nghịch đảo tọa độ box về ảnh gốc để lưu Label.txt chuẩn PPOCRLabel.
     3. Sắp xếp các cột theo thứ tự từ PHẢI SANG TRÁI (quy tắc đọc văn bản cổ).
-    4. Chuẩn hóa ký tự sang Hán Phồn thể cổ (Traditional Chinese) qua OpenCC.
+    4. Giữ nguyên chữ Hán thô nguyên trạng từ mô hình OCR (không qua chuyển đổi giản-phồn OpenCC/s2t).
     """
     engine = get_han_engine()
     img = cv2.imread(han_img_path)
@@ -396,32 +388,28 @@ def process_han_ocr(han_img_path: str, doc_id: str):
         res_direct, _ = engine(img)
         if not res_direct:
             return "", []
-        cc = get_opencc()
         boxes_data = []
         lines = []
         for box, text, _ in res_direct:
-            txt = cc.convert(clean_text_line(text))
+            txt = clean_text_line(text)
             if not txt: continue
             int_box = [[int(pt[0]), int(pt[1])] for pt in box]
             boxes_data.append({"transcription": txt, "points": int_box})
             lines.append(txt)
         return "\n".join(lines), boxes_data
 
-    cc = get_opencc()
     cols = []
     for box, text, score in res:
         txt = clean_text_line(text)
         if not txt:
             continue
-        # Chuyển đổi về Hán Phồn thể
-        trad_txt = cc.convert(txt)
         # Nghịch đảo tọa độ điểm từ rot_ccw về ảnh gốc
         # x_orig = W - 1 - y_rot, y_orig = x_rot
         orig_box = [[int(W - 1 - pt[1]), int(pt[0])] for pt in box]
         x_center = sum(p[0] for p in orig_box) / 4.0
         cols.append({
             "box": orig_box,
-            "text": trad_txt,
+            "text": txt,
             "x_center": x_center
         })
         

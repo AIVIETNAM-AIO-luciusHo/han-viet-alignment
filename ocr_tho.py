@@ -209,11 +209,13 @@ def main():
             acc = (n_ok / len(details) * 100) if details else 0
             print(f"      [Auto-Correction] Chữ Hán khớp âm từ điển: {n_ok}/{len(details)} ({acc:.1f}%)")
             
-            # Lưu file chữ Hán đã sửa chuẩn xác vào 02_ocr_tho/han/<doc_id>.txt
-            han_file.write_text(corr_han_txt, encoding="utf-8")
+            # Lưu file OCR thô chữ Hán nguyên trạng vào 02_ocr_tho/han/<doc_id>.txt (chuẩn hợp đồng: không sửa tay)
+            han_file.write_text(han_txt, encoding="utf-8")
             
             # Lưu meta cache để resume
             meta_file.write_text(json.dumps({
+                "han_raw": han_txt,
+                "han_clean": corr_han_txt,
                 "pa": pa_txt,
                 "dn": dn_txt,
                 "vi_boxes": vi_boxes,

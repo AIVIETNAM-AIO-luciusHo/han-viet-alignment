@@ -29,7 +29,37 @@ _vietocr_predictor = None
 def get_han_engine():
     global _rapid_han
     if _rapid_han is None:
-        _rapid_han = RapidOCR()
+        cur = Path(__file__).resolve()
+        project_root = None
+        for p in [cur] + list(cur.parents):
+            if (p / ".git").exists() or (p / "guideline").exists():
+                project_root = p
+                break
+        if project_root is None:
+            project_root = Path.cwd()
+
+        v6_dir = project_root / "models" / "ppocrv6"
+        v6_det = v6_dir / "PP-OCRv6_det_medium.onnx"
+        v6_rec = v6_dir / "PP-OCRv6_rec_medium.onnx"
+
+        # Tự động tải nếu máy thành viên khác chưa có model v6
+        if not (v6_det.exists() and v6_rec.exists()):
+            try:
+                print("[*] Đang tải mô hình Paddle v6 (PP-OCRv6 Medium) từ HuggingFace...")
+                v6_dir.mkdir(parents=True, exist_ok=True)
+                from huggingface_hub import hf_hub_download
+                hf_hub_download(repo_id="haotruong-hitlab/pp-ocrv6-medium-onnx", filename="PP-OCRv6_det_medium.onnx", local_dir=str(v6_dir))
+                hf_hub_download(repo_id="haotruong-hitlab/pp-ocrv6-medium-onnx", filename="PP-OCRv6_rec_medium.onnx", local_dir=str(v6_dir))
+            except Exception as e:
+                print(f"[!] Không thể tải tự động model v6: {e}")
+
+        if v6_det.exists() and v6_rec.exists():
+            print("[*] Đang khởi tạo OCR chữ Hán với mô hình Paddle v6 (PP-OCRv6 Medium)...")
+            _rapid_han = RapidOCR(det_model_path=str(v6_det), rec_model_path=str(v6_rec))
+        else:
+            print("[*] Khởi tạo RapidOCR mặc định...")
+            _rapid_han = RapidOCR()
+
         _rapid_han.text_det.postprocess_op.thresh = 0.15
         _rapid_han.text_det.postprocess_op.box_thresh = 0.20
         _rapid_han.text_det.postprocess_op.unclip_ratio = 1.8

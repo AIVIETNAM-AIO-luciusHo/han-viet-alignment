@@ -178,6 +178,91 @@ def clean_and_correct_sac_phong_viet(text: str, is_dich_nghia: bool = False) -> 
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
+def format_han_content(raw_text: str) -> str:
+    """
+    Quy ước nội dung 'han' của Thầy Cô:
+    - Chữ viết liền, không có khoảng trắng.
+    - Giữ đúng chữ bản gốc: phồn thể, dị thể, chữ số đại tự (拾, 貳...).
+    - Không tự chuyển giản <-> phồn.
+    - Tuyệt đối không có chữ Latin, chữ số Ả Rập hay số chú thích.
+    - Chỉ chứa chữ Hán, ký hiệu □ (U+25A1) và dấu câu Hán (nếu có trong nguồn).
+    """
+    if not raw_text:
+        return ""
+    # Chuẩn hóa tất cả các biến thể ô vuông hoặc ký tự hỏng về đúng □ (U+25A1)
+    text = re.sub(r'[\u25a0-\u25a9\u25fc\u3013\ufffd\u25ad-\u25b0]', '□', raw_text)
+    valid_chars = []
+    for ch in text:
+        cp = ord(ch)
+        # CJK Unified Ideographs, Extension A-H, Compatibility
+        if (0x4e00 <= cp <= 0x9fff or 0x3400 <= cp <= 0x4dbf or 
+            0xf900 <= cp <= 0xfaff or 0x20000 <= cp <= 0x323af or 
+            ch in '□、。，；：·「」『』'):
+            valid_chars.append(ch)
+    return ''.join(valid_chars)
+
+def format_phien_am_content(raw_text: str) -> str:
+    """
+    Quy ước nội dung 'phien_am' của Thầy Cô:
+    - Giữ chữ hoa/thường và dấu câu như sách.
+    - Chuẩn hóa ký tự khuyết thành □ (U+25A1).
+    - Lọc bỏ số rác, chữ rác mép ảnh và tiêu đề trang ngoài nội dung sắc phong.
+    - Loại bỏ chỉ mục chú thích *, +.
+    """
+    if not raw_text:
+        return ""
+    text = re.sub(r'[\u25a0-\u25a9\u25fc\u3013\ufffd\u25ad-\u25b0]', '□', raw_text)
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        l = line.strip()
+        if re.search(r'SẮC\s+PHONG\s+LƯU\s+TẠI', l, re.I):
+            continue
+        l = re.sub(r'^\d+\s*([A-Za-z0-9:]+\s+)?(?=Sắc|Chiếu|Chỉ|sư|nguyên)', '', l)
+        l = re.sub(r'[\*\+]', '', l)
+        if l:
+            cleaned_lines.append(l)
+    res = ' '.join(cleaned_lines)
+    return re.sub(r'\s+', ' ', res).strip()
+
+def format_dich_nghia_content(raw_text: str) -> str:
+    """
+    Quy ước nội dung 'dich_nghia' của Thầy Cô:
+    - Giữ nguyên bản dịch của sách, kể cả chữ số và năm dương lịch trong ngoặc (1854).
+    - BỎ chỉ mục chú thích ([1], (1)...) và chú thích chân trang (*Nay là...).
+    - Đoạn bản dịch bị khuyết ghi [...] (không dùng ký hiệu khác).
+    - Chỉ sửa lỗi OCR, không sửa văn phong.
+    """
+    if not raw_text or raw_text.strip() == '[Sách gốc không có bản dịch]' or raw_text.strip() == '[...]':
+        return '[...]'
+        
+    lines = raw_text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        l = line.strip()
+        if re.search(r'^\*?\s*(\(Sao\s+chép|Sao\s+chép\s+tại)', l, re.I):
+            continue
+        if re.search(r'^\*?\s*[Nn]ay\s+(là|thuộc)', l, re.I):
+            continue
+        cleaned_lines.append(l)
+    text = ' '.join(cleaned_lines)
+    
+    # Cắt bỏ phần chú thích chân trang địa danh xuất hiện sau năm dương lịch cuối cùng
+    m = list(re.finditer(r'\(\s*(?:17|18|19|20)\d\d\s*\)', text))
+    if m:
+        last_year = m[-1]
+        tail = text[last_year.end():]
+        if re.search(r'[Nn]ay|[Kk]hu|[Pp]hường|[Xx]ã|[Tt]hành|[Hh]uyện|Sao\s*chép', tail):
+            text = text[:last_year.end()] + '.'
+            
+    text = re.sub(r'[\*\+]', '', text)
+    text = re.sub(r'\[\d{1,2}\]', '', text)
+    text = re.sub(r'\((?!1[789]\d\d|20\d\d)\d{1,2}\)', '', text)
+    text = re.sub(r'(?<=[a-zA-Zà-ỹÀ-Ỹ])\?(?=\s|,|\.|$)', '', text)
+    
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text if text else '[...]'
+
 def clean_text_line(s: str) -> str:
     """Loại bỏ khoảng trắng thừa."""
     return re.sub(r"\s+", " ", s).strip()

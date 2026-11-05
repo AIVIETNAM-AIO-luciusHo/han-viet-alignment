@@ -2,7 +2,14 @@
 
 from .pdf_extractor import extract_page_images
 from .layout_parser import process_and_crop_page
-from .ocr_pipeline import process_viet_ocr, process_han_ocr
+from .ocr_pipeline import (
+    process_viet_ocr,
+    process_han_ocr,
+    format_han_content,
+    format_phien_am_content,
+    format_dich_nghia_content,
+    clean_and_correct_sac_phong_viet,
+)
 from .han_auto_corrector import get_corrector, syl_key, HanAutoCorrector
 from .dictionary_helper import SinoNomDictionary
 
@@ -11,6 +18,10 @@ __all__ = [
     "process_and_crop_page",
     "process_viet_ocr",
     "process_han_ocr",
+    "format_han_content",
+    "format_phien_am_content",
+    "format_dich_nghia_content",
+    "clean_and_correct_sac_phong_viet",
     "get_corrector",
     "syl_key",
     "HanAutoCorrector",

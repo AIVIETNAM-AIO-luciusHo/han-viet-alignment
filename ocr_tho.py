@@ -55,13 +55,23 @@ try:
         process_viet_ocr,
         process_han_ocr,
         get_corrector,
-        syl_key
+        syl_key,
+        format_han_content,
+        format_phien_am_content,
+        format_dich_nghia_content
     )
 except ImportError:
-    from src.pdf_extractor import extract_page_images
-    from src.layout_parser import process_and_crop_page
-    from src.ocr_pipeline import process_viet_ocr, process_han_ocr
-    from src.han_auto_corrector import get_corrector, syl_key
+    from src.han_viet_alignment.sac_phong import (
+        extract_page_images,
+        process_and_crop_page,
+        process_viet_ocr,
+        process_han_ocr,
+        get_corrector,
+        syl_key,
+        format_han_content,
+        format_phien_am_content,
+        format_dich_nghia_content
+    )
 
 def parse_page_range(pages_str: str, max_pages: int):
     """Phân tích chuỗi trang, ví dụ: '4-7' hoặc '5' hoặc 'all'."""
@@ -84,6 +94,7 @@ def main():
     parser.add_argument("--out-dir", default=None, help="Thư mục xuất kết quả (mặc định: ./<ma-sach>)")
     parser.add_argument("--cache-dir", default="cache_pages", help="Thư mục tạm lưu ảnh trang PDF")
     parser.add_argument("--force", action="store_true", default=False, help="Chạy lại từ đầu, ghi đè toàn bộ các văn bản cũ")
+    parser.add_argument("--update-text-only", action="store_true", default=False, help="Chỉ chuẩn hóa lại 03_text_sach theo đúng Quy ước nội dung từ dữ liệu OCR hiện có")
     
     args = parser.parse_args()
     
@@ -94,6 +105,53 @@ def main():
         ma_sach = "R1003" if "3" in str(args.pdf) else "R1001"
     out_dir = Path(args.out_dir if args.out_dir else ma_sach)
     cache_dir = Path(args.cache_dir) / ma_sach
+    
+    # Chế độ chuẩn hóa nhanh toàn bộ 03_text_sach từ cache theo Quy ước nội dung
+    if args.update_text_only:
+        print("=" * 70)
+        print(f"🚀 CHUẨN HÓA 03_TEXT_SACH THEO QUY ƯỚC NỘI DUNG ({ma_sach})")
+        print("=" * 70)
+        out_viet_dir = out_dir / "02_ocr_tho" / "viet"
+        out_han_dir = out_dir / "02_ocr_tho" / "han"
+        out_text_dir = out_dir / "03_text_sach"
+        out_text_dir.mkdir(parents=True, exist_ok=True)
+        
+        meta_files = sorted(out_viet_dir.glob("*_meta.json"), key=lambda p: p.stem)
+        if not meta_files:
+            print(f"[!] Không tìm thấy dữ liệu OCR trong {out_viet_dir}")
+            return
+            
+        th_lines, tpa_lines, tdn_lines = [], [], []
+        for mf in meta_files:
+            doc_id = mf.stem.replace("_meta", "")
+            try:
+                mdata = json.loads(mf.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            han_txt = mdata.get("han_clean") or mdata.get("han_raw", "")
+            if not han_txt:
+                hf = out_han_dir / f"{doc_id}.txt"
+                if hf.exists():
+                    han_txt = hf.read_text(encoding="utf-8")
+            pa_txt = mdata.get("pa", "")
+            dn_txt = mdata.get("dn", "")
+            
+            clean_han = format_han_content(han_txt)
+            clean_pa = format_phien_am_content(pa_txt)
+            clean_dn = format_dich_nghia_content(dn_txt)
+            
+            th_lines.append(f"### {doc_id}\n{clean_han}\n")
+            tpa_lines.append(f"### {doc_id}\n{clean_pa}\n")
+            tdn_lines.append(f"### {doc_id}\n{clean_dn}\n")
+            
+        (out_text_dir / "han.txt").write_text("\n".join(th_lines) + "\n", encoding="utf-8")
+        (out_text_dir / "phien_am.txt").write_text("\n".join(tpa_lines) + "\n", encoding="utf-8")
+        (out_text_dir / "dich_nghia.txt").write_text("\n".join(tdn_lines) + "\n", encoding="utf-8")
+        print(f"[✓] Đã chuẩn hóa thành công {len(th_lines)} văn bản theo 100% Quy ước nội dung!")
+        print(f"    - {out_text_dir / 'han.txt'}")
+        print(f"    - {out_text_dir / 'phien_am.txt'}")
+        print(f"    - {out_text_dir / 'dich_nghia.txt'}")
+        return
     
     # 1. Xác định số trang của file PDF
     import pypdf
@@ -181,7 +239,7 @@ def main():
             print(f"  -> [{i+1}/{len(all_docs)}] Đã có sẵn dữ liệu OCR cho {doc_id} (Trang {doc['page_num']}) -> Tái sử dụng.")
             try:
                 mdata = json.loads(meta_file.read_text(encoding="utf-8"))
-                corr_han_txt = han_file.read_text(encoding="utf-8")
+                corr_han_txt = mdata.get("han_clean") or han_file.read_text(encoding="utf-8")
                 pa_txt = mdata.get("pa", "")
                 dn_txt = mdata.get("dn", "")
                 vi_boxes = mdata.get("vi_boxes", [])
@@ -228,11 +286,14 @@ def main():
         han_label_lines.append(f"{han_img_rel}\t{json.dumps(han_boxes, ensure_ascii=False)}")
         han_filestate_lines.append(f"{han_img_rel}\t1")
         
-        # Tích lũy cho 03_text_sach/ (Chữ Hán chuẩn hóa phục vụ dóng hàng)
-        text_sach_han.append(f"### {doc_id}\n{corr_han_txt}\n")
-        text_sach_pa.append(f"### {doc_id}\n{pa_txt}\n")
-        dn_final = dn_txt if dn_txt.strip() else "[Sách gốc không có bản dịch]"
-        text_sach_dn.append(f"### {doc_id}\n{dn_final}\n")
+        # Tích lũy cho 03_text_sach/ (Tự động chuẩn hóa 100% theo đúng Quy ước nội dung của Thầy Cô)
+        clean_han = format_han_content(corr_han_txt if corr_han_txt else han_txt)
+        clean_pa = format_phien_am_content(pa_txt)
+        clean_dn = format_dich_nghia_content(dn_txt)
+        
+        text_sach_han.append(f"### {doc_id}\n{clean_han}\n")
+        text_sach_pa.append(f"### {doc_id}\n{clean_pa}\n")
+        text_sach_dn.append(f"### {doc_id}\n{clean_dn}\n")
         
         # Ghi file định kỳ sau mỗi 10 văn bản hoặc văn bản cuối cùng để chống mất dữ liệu
         if (i + 1) % 10 == 0 or (i + 1) == len(all_docs):

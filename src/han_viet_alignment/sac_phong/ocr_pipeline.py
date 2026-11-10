@@ -63,6 +63,11 @@ def get_han_engine():
         _rapid_han.text_det.postprocess_op.thresh = 0.15
         _rapid_han.text_det.postprocess_op.box_thresh = 0.20
         _rapid_han.text_det.postprocess_op.unclip_ratio = 1.8
+        # RapidOCR bỏ cả dòng có điểm < text_score. Đã đo trên R1001.001–007 qua đường xử lý thật,
+        # chấm như kiem_tra_du_lieu.py: 0.5 -> 201/423 (47,5%); 0.1 -> 203/467 (43,5%);
+        # 0.1 + lọc dòng rác (alignment/han_filter.py) -> 201/450 (44,7%). Hạ ngưỡng chủ yếu thêm chữ sai
+        # nên giữ 0.5. Với 0.5, bộ lọc han_filter không loại gì (chỉ xét dòng điểm < 0.5).
+        _rapid_han.text_score = 0.5
     return _rapid_han
 
 def get_viet_detector():
@@ -505,11 +510,11 @@ def process_han_ocr(han_img_path: str, doc_id: str):
             return "", []
         boxes_data = []
         lines = []
-        for box, text, _ in res_direct:
+        for box, text, score in res_direct:
             txt = clean_text_line(text)
             if not txt: continue
             int_box = [[int(pt[0]), int(pt[1])] for pt in box]
-            boxes_data.append({"transcription": txt, "points": int_box})
+            boxes_data.append({"transcription": txt, "points": int_box, "score": round(float(score), 4)})
             lines.append(txt)
         return "\n".join(lines), boxes_data
 
@@ -525,14 +530,16 @@ def process_han_ocr(han_img_path: str, doc_id: str):
         cols.append({
             "box": orig_box,
             "text": txt,
-            "x_center": x_center
+            "x_center": x_center,
+            "score": round(float(score), 4),
         })
-        
+
     # Sắp xếp các cột từ PHẢI SANG TRÁI (x_center giảm dần)
     cols.sort(key=lambda c: -c["x_center"])
-    
+
     lines = [c["text"] for c in cols]
-    boxes_data = [{"transcription": c["text"], "points": c["box"]} for c in cols]
+    # "score" (độ tin cậy nhận dạng) dùng để lọc dòng rác; bỏ khi ghi Label.txt (PPOCRLabel chỉ cần 2 khóa)
+    boxes_data = [{"transcription": c["text"], "points": c["box"], "score": c["score"]} for c in cols]
     
     han_text = "\n".join(lines)
     return han_text, boxes_data

@@ -1,7 +1,7 @@
 """
 ocr_tho.py — Pipeline trích xuất PDF và tạo dữ liệu OCR thô (02_ocr_tho) Sắc phong (R1001 / R1003).
 
-Cách dùng:
+Cách dùng (đặt PDF vào docs-local/NLP-20261101T150232Z-1-001/NLP/, chỉ cần truyền tên file):
     # 1. Chạy thử nghiệm trên 4 trang mẫu (trang 4 đến 7 của tập 1):
     python ocr_tho.py --pdf "tap 1.pdf" --pages 4-7 --ma-sach R1001
 
@@ -35,8 +35,23 @@ Cách dùng:
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
+
+# Thư mục lưu trữ PDF sách gốc (local, không commit — xem .gitignore và metadata/books.json)
+SOURCE_DIR = Path(__file__).parent / "docs-local" / "NLP-20261101T150232Z-1-001" / "NLP"
+
+
+def resolve_pdf(pdf_arg: str) -> Path:
+    """Tìm PDF: dùng đường dẫn đã cho nếu tồn tại, ngược lại tìm theo tên trong SOURCE_DIR."""
+    p = Path(pdf_arg)
+    if p.exists():
+        return p
+    candidate = SOURCE_DIR / p.name
+    if candidate.exists():
+        return candidate
+    sys.exit(f"[!] Không tìm thấy PDF '{pdf_arg}'. Hãy đặt file vào: {SOURCE_DIR}")
 
 # Đảm bảo UTF-8 cho console stdout/stderr trên Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -73,6 +88,49 @@ except ImportError:
         format_dich_nghia_content
     )
 
+from han_viet_alignment.alignment.han_filter import filter_han_lines  # noqa: E402
+from han_viet_alignment.common.dictionary import load_readings  # noqa: E402
+
+DROP_LOG_COLUMNS = ["doc_id", "score", "khop_am", "so_chu", "dong_bi_loai"]
+
+
+def build_han_clean(corrector, han_raw: str, han_boxes: list, pa_txt: str, doc_id: str, drop_log: list):
+    """OCR thô -> lọc dòng rác (điểm thấp + không khớp âm) -> sửa chữ giống hình -> chuỗi Hán cho 03_text_sach.
+
+    02_ocr_tho/han/<doc_id>.txt không bị ảnh hưởng (vẫn là OCR thô đầy đủ).
+    """
+    lines = han_raw.split("\n")
+    scores = [b.get("score") for b in han_boxes] if len(han_boxes) == len(lines) else [None] * len(lines)
+    infos = filter_han_lines(lines, scores, pa_txt, load_readings())
+    for info in infos:
+        if not info.kept:
+            drop_log.append({"doc_id": doc_id, "score": f"{info.score:.2f}", "khop_am": f"{info.n_match}/{info.n_han}",
+                             "so_chu": str(info.n_han), "dong_bi_loai": info.text})
+    kept = "\n".join(info.text for info in infos if info.kept)
+    corrected, details = corrector.correct_han(kept, pa_txt)
+    return corrected, details
+
+
+def write_drop_log(ma_sach: str, drop_log: list, doc_ids: set) -> None:
+    """workspace/<MA_SACH>/han_dong_bi_loai.tsv: thay mục của các văn bản vừa chạy, giữ mục của đợt trước."""
+    path = Path(__file__).parent / "workspace" / ma_sach / "han_dong_bi_loai.tsv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    if path.exists():
+        old = path.read_text(encoding="utf-8").splitlines()[1:]
+        rows = [r.split("\t") for r in old if r and r.split("\t")[0] not in doc_ids]
+    rows += [[r[c] for c in DROP_LOG_COLUMNS] for r in drop_log]
+    rows.sort(key=lambda r: r[0])
+    text = "\n".join(["\t".join(DROP_LOG_COLUMNS)] + ["\t".join(r) for r in rows]) + "\n"
+    path.write_bytes(text.encode("utf-8"))
+    print(f"[*] Đã loại {len(drop_log)} dòng OCR chữ Hán rác (điểm < 0.5 và khớp âm < 30%) -> {path}")
+
+
+def label_boxes(boxes: list) -> list:
+    """Label.txt theo PPOCRLabel: chỉ transcription + points."""
+    return [{"transcription": b["transcription"], "points": b["points"]} for b in boxes]
+
+
 def parse_page_range(pages_str: str, max_pages: int):
     """Phân tích chuỗi trang, ví dụ: '4-7' hoặc '5' hoặc 'all'."""
     if not pages_str or pages_str.lower() == "all":
@@ -88,7 +146,7 @@ def parse_page_range(pages_str: str, max_pages: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Pipeline trích xuất PDF & tạo dữ liệu OCR thô (02_ocr_tho) Sắc phong R1001 / R1003")
-    parser.add_argument("--pdf", default="tap 1.pdf", help="Đường dẫn file PDF sách (mặc định: 'tap 1.pdf')")
+    parser.add_argument("--pdf", default="tap 1.pdf", help="Tên hoặc đường dẫn file PDF; tên trần sẽ được tìm trong docs-local/NLP-20261101T150232Z-1-001/NLP/ (mặc định: 'tap 1.pdf')")
     parser.add_argument("--pages", default="4-178", help="Dải trang cần chạy, ví dụ '4-7' hoặc '4-178' (mặc định: '4-178')")
     parser.add_argument("--ma-sach", default=None, help="Mã sách quy định (mặc định: 'R1001' cho tập 1, 'R1003' cho tập 3)")
     parser.add_argument("--out-dir", default=None, help="Thư mục xuất kết quả (mặc định: ./<ma-sach>)")
@@ -102,7 +160,7 @@ def main():
     if args.ma_sach:
         ma_sach = args.ma_sach
     else:
-        ma_sach = "R1003" if "3" in str(args.pdf) else "R1001"
+        ma_sach = "R1003" if "3" in Path(args.pdf).name else "R1001"
     out_dir = Path(args.out_dir if args.out_dir else ma_sach)
     cache_dir = Path(args.cache_dir) / ma_sach
     
@@ -124,6 +182,8 @@ def main():
             print(f"[!] Không tìm thấy dữ liệu OCR trong {meta_dir} hoặc {out_viet_dir}")
             return
             
+        corrector = get_corrector()
+        drop_log, seen = [], set()
         th_lines, tpa_lines, tdn_lines = [], [], []
         for mf in meta_files:
             doc_id = mf.stem.replace("_meta", "")
@@ -131,14 +191,17 @@ def main():
                 mdata = json.loads(mf.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            han_txt = mdata.get("han_clean") or mdata.get("han_raw", "")
+            han_txt = mdata.get("han_raw", "")
             if not han_txt:
                 hf = out_han_dir / f"{doc_id}.txt"
                 if hf.exists():
                     han_txt = hf.read_text(encoding="utf-8")
             pa_txt = mdata.get("pa", "")
             dn_txt = mdata.get("dn", "")
-            
+            # Tính lại từ OCR thô (không dùng han_clean cache cũ có thể chứa chữ đoán theo âm)
+            seen.add(doc_id)
+            han_txt, _ = build_han_clean(corrector, han_txt, mdata.get("han_boxes", []), pa_txt, doc_id, drop_log)
+
             clean_han = format_han_content(han_txt)
             clean_pa = format_phien_am_content(pa_txt)
             clean_dn = format_dich_nghia_content(dn_txt)
@@ -150,6 +213,7 @@ def main():
         (out_text_dir / "han.txt").write_text("\n".join(th_lines) + "\n", encoding="utf-8")
         (out_text_dir / "phien_am.txt").write_text("\n".join(tpa_lines) + "\n", encoding="utf-8")
         (out_text_dir / "dich_nghia.txt").write_text("\n".join(tdn_lines) + "\n", encoding="utf-8")
+        write_drop_log(ma_sach, drop_log, seen)
         print(f"[✓] Đã chuẩn hóa thành công {len(th_lines)} văn bản theo 100% Quy ước nội dung!")
         print(f"    - {out_text_dir / 'han.txt'}")
         print(f"    - {out_text_dir / 'phien_am.txt'}")
@@ -157,6 +221,7 @@ def main():
         return
     
     # 1. Xác định số trang của file PDF
+    args.pdf = str(resolve_pdf(args.pdf))
     import pypdf
     reader = pypdf.PdfReader(args.pdf)
     total_pages = len(reader.pages)
@@ -214,7 +279,8 @@ def main():
     # 4. Bước 3: Chạy OCR cho các vùng và sinh Label.txt
     print("\n[BƯỚC 3/4] Chạy OCR cho chữ Hán, Phiên âm và Dịch nghĩa...")
     corrector = get_corrector()
-    
+    drop_log = []
+
     han_label_lines = []
     viet_label_lines = []
     han_filestate_lines = []
@@ -247,11 +313,13 @@ def main():
             print(f"  -> [{i+1}/{len(all_docs)}] Đã có sẵn dữ liệu OCR cho {doc_id} (Trang {doc['page_num']}) -> Tái sử dụng.")
             try:
                 mdata = json.loads(meta_file.read_text(encoding="utf-8"))
-                corr_han_txt = mdata.get("han_clean") or han_file.read_text(encoding="utf-8")
                 pa_txt = mdata.get("pa", "")
+                # Tính lại từ OCR thô thay vì dùng han_clean đã cache (cache cũ có thể chứa chữ đoán hoặc toàn □)
+                han_txt = mdata.get("han_raw") or han_file.read_text(encoding="utf-8")
                 dn_txt = mdata.get("dn", "")
                 vi_boxes = mdata.get("vi_boxes", [])
                 han_boxes = mdata.get("han_boxes", [])
+                corr_han_txt, _ = build_han_clean(corrector, han_txt, han_boxes, pa_txt, doc_id, drop_log)
             except Exception:
                 # Nếu file lỗi thì chạy lại OCR
                 corr_han_txt = None
@@ -269,8 +337,8 @@ def main():
             # OCR Chữ Hán
             han_txt, han_boxes = process_han_ocr(doc["han_img"], doc_id)
             
-            # Tự động sửa lỗi chữ Hán (Auto-Correction) kết hợp Phiên âm và Từ điển Hán Nôm
-            corr_han_txt, details = corrector.correct_han(han_txt, pa_txt)
+            # Lọc dòng rác rồi sửa chữ giống hình (không đoán chữ theo âm) — xem build_han_clean
+            corr_han_txt, details = build_han_clean(corrector, han_txt, han_boxes, pa_txt, doc_id, drop_log)
             n_ok = sum(1 for d in details if syl_key(d['syllable']) in corrector.han_readings.get(d['char'], ()))
             acc = (n_ok / len(details) * 100) if details else 0
             print(f"      [Auto-Correction] Chữ Hán khớp âm từ điển: {n_ok}/{len(details)} ({acc:.1f}%)")
@@ -291,7 +359,7 @@ def main():
         # Ghi Label.txt theo format: <folder>/<image>\t<json_boxes>
         viet_label_lines.append(f"{viet_img_rel}\t{json.dumps(vi_boxes, ensure_ascii=False)}")
         viet_filestate_lines.append(f"{viet_img_rel}\t1")
-        han_label_lines.append(f"{han_img_rel}\t{json.dumps(han_boxes, ensure_ascii=False)}")
+        han_label_lines.append(f"{han_img_rel}\t{json.dumps(label_boxes(han_boxes), ensure_ascii=False)}")
         han_filestate_lines.append(f"{han_img_rel}\t1")
         
         # Tích lũy cho 03_text_sach/ (Tự động chuẩn hóa 100% theo đúng Quy ước nội dung của Thầy Cô)
@@ -348,7 +416,8 @@ def main():
         book_p = d['page_num'] + 1  # Trang sách in = Trang PDF + 1 (do 3 trang đầu là bìa và lời tựa)
         page_map_lines.append(f"{d['doc_id']}\t{d['page_num']}\t{book_p}\t{d.get('layout', 'unknown')}\than/{d['doc_id']}_1.jpg\tviet/{d['doc_id']}_1.jpg")
     (out_dir / "page_mapping.tsv").write_text("\n".join(page_map_lines) + "\n", encoding="utf-8")
-    
+    write_drop_log(ma_sach, drop_log, {d["doc_id"] for d in all_docs})
+
     print("\n" + "=" * 70)
     print(f"🎉 HOÀN THÀNH XUẤT SẮC!")
     print(f"  • Tổng số văn bản đã trích xuất: {len(all_docs)}")

@@ -61,7 +61,9 @@ class HanAutoCorrector:
     def _load_data(self):
         print("[*] Đang nạp từ điển Hán Nôm và ma trận chữ tương tự...")
         # 1. Nạp QuocNgu_SinoNom_TongHop3
-        if self.dict_path.exists():
+        if not self.dict_path.exists():
+            print(f"[!] KHÔNG THẤY TỪ ĐIỂN {self.dict_path} — tắt Auto-Correction, giữ nguyên chữ Hán OCR thô.")
+        else:
             df_th = pd.read_excel(self.dict_path, dtype=str).dropna()
             for qn, sn in zip(df_th.iloc[:, 0], df_th.iloc[:, 1]):
                 k = syl_key(qn)
@@ -114,28 +116,20 @@ class HanAutoCorrector:
 
         print(f"[✓] Đã khởi tạo Auto-Corrector: {len(self.han_readings)} chữ Hán, {len(self.similar_map)} chữ tương tự.")
 
-    def get_best_candidate(self, sk: str) -> str:
-        cands = self.qn_to_han.get(sk, [])
-        if not cands:
-            base = re.sub(r'\d+$', '', sk)
-            for t in ['5', '2', '1', '3', '4', '0']:
-                cands.extend(self.qn_to_han.get(base + t, []))
-        if not cands:
-            return "□"
-        def score_cand(c):
-            fw = self.freq_weights.get(c, 0)
-            cjk_bonus = 1 if 0x4E00 <= ord(c) <= 0x9FFF else 0
-            return (fw, cjk_bonus)
-        return max(cands, key=score_cand)
-
     def correct_han(self, raw_han: str, phien_am: str) -> Tuple[str, List[Dict]]:
         """
         Sử dụng thuật toán Needleman-Wunsch căn chỉnh chuỗi:
         - raw_han: chuỗi chữ Hán thô từ OCR.
         - phien_am: chuỗi phiên âm tiếng Việt chuẩn từ VietOCR.
-        Trả về: (chuỗi chữ Hán đã sửa chuẩn, danh sách các bước sửa).
+        Trả về: (chuỗi chữ Hán đã sửa, danh sách các bước sửa).
+
+        Theo HUONG_DAN_DO_AN mục 3 ("giữ đúng chữ của bản gốc") và bước 7 ("đối chiếu ảnh gốc để sửa"):
+        KHÔNG sinh chữ Hán từ phiên âm. Chỉ sửa khi chữ OCR có hình dạng gần giống một chữ đúng âm
+        (Trường hợp 2). Chữ OCR sai mà không có ứng viên hình dạng -> giữ nguyên ('keep_ocr') để
+        người hiệu đính sửa theo ảnh; chữ OCR bỏ sót -> ghi □ ('missing') và ghi chú khi dóng hàng.
         """
-        if not phien_am:
+        if not phien_am or not self.han_readings:
+            # Không có từ điển thì mọi âm đều không tra được -> sẽ thay toàn bộ bằng □; giữ nguyên OCR thô
             return raw_han, []
 
         han_chars = [c for c in raw_han if is_han(c)]
@@ -163,7 +157,6 @@ class HanAutoCorrector:
         for i in range(1, M + 1):
             syl = pa_syls[i - 1]
             sk = syl_key(syl)
-            best_cand = self.get_best_candidate(sk)
 
             for j in range(1, N + 1):
                 ch = han_chars[j - 1]
@@ -180,9 +173,9 @@ class HanAutoCorrector:
                         score = dp[i - 1][j - 1] + 9
                         action = ("similar", sim_match)
                     else:
-                        # Trường hợp 3: Thay thế bằng chữ chuẩn nhất của âm tiết đó
+                        # Trường hợp 3: chữ OCR không khớp âm, không có chữ giống hình -> giữ nguyên chữ OCR
                         score = dp[i - 1][j - 1] - 4
-                        action = ("sub", best_cand)
+                        action = ("keep_ocr", ch)
 
                 if score > dp[i][j]:
                     dp[i][j] = score
@@ -194,11 +187,11 @@ class HanAutoCorrector:
                     dp[i][j] = del_score
                     backtrack[i][j] = (i, j - 1, "del_ocr")
 
-                # Chèn chữ bị OCR bỏ sót
+                # Chữ bị OCR bỏ sót: ghi □ (mục 3: mỗi chữ thiếu một □), không đoán chữ theo âm
                 ins_score = dp[i - 1][j] - 5
                 if ins_score > dp[i][j]:
                     dp[i][j] = ins_score
-                    backtrack[i][j] = (i - 1, j, ("ins_pa", best_cand))
+                    backtrack[i][j] = (i - 1, j, ("missing", "□"))
 
         # Truy vết kết quả
         curr_i, curr_j = M, N
@@ -207,18 +200,17 @@ class HanAutoCorrector:
             prev_i, prev_j, act = backtrack[curr_i][curr_j]
             if act == "del_ocr":
                 pass
-            elif isinstance(act, tuple) and act[0] in ("match", "similar", "sub", "ins_pa"):
+            elif isinstance(act, tuple) and act[0] in ("match", "similar", "keep_ocr", "missing"):
                 aligned.append({
                     "syllable": pa_syls[curr_i - 1],
                     "char": act[1],
                     "action": act[0]
                 })
-            elif act == "ins_pa":
-                sk = syl_key(pa_syls[curr_i - 1])
+            elif act == "ins_pa":  # cột 0: không còn chữ OCR nào
                 aligned.append({
                     "syllable": pa_syls[curr_i - 1],
-                    "char": self.get_best_candidate(sk),
-                    "action": "ins_pa"
+                    "char": "□",
+                    "action": "missing"
                 })
             curr_i, curr_j = prev_i, prev_j
 

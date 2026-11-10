@@ -1,1 +1,1 @@
-"""Xuất TSV/XLSX và gói bàn giao theo hướng dẫn hành chính; chưa triển khai đóng gói."""
+"""Xuất TSV/XLSX theo hướng dẫn hành chính (writer.py); chưa triển khai đóng gói zip."""

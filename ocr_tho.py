@@ -253,8 +253,10 @@ def main():
     all_docs = []
     
     # Tự động tiếp nối số thứ tự văn bản nếu đã có sẵn trong thư mục
+    first_page_of_book = 5 if ma_sach == "R1003" else 4
+    is_resume = start_p > first_page_of_book
     existing_docs = list((out_dir / "02_ocr_tho" / "han").glob(f"{ma_sach}.*_1.jpg")) if (out_dir / "02_ocr_tho" / "han").exists() else []
-    if existing_docs and start_p > 4:
+    if existing_docs and is_resume:
         # Tìm số lớn nhất hiện có
         nums = []
         for f in existing_docs:
@@ -373,17 +375,18 @@ def main():
         
         # Ghi file định kỳ sau mỗi 10 văn bản hoặc văn bản cuối cùng để chống mất dữ liệu
         if (i + 1) % 10 == 0 or (i + 1) == len(all_docs):
-            (out_viet_dir / "Label.txt").write_text("\n".join(viet_label_lines) + "\n", encoding="utf-8")
-            (out_viet_dir / "fileState.txt").write_text("\n".join(viet_filestate_lines) + "\n", encoding="utf-8")
-            (out_han_dir / "Label.txt").write_text("\n".join(han_label_lines) + "\n", encoding="utf-8")
-            (out_han_dir / "fileState.txt").write_text("\n".join(han_filestate_lines) + "\n", encoding="utf-8")
-            (out_text_dir / "han.txt").write_text("\n".join(text_sach_han) + "\n", encoding="utf-8")
-            (out_text_dir / "phien_am.txt").write_text("\n".join(text_sach_pa) + "\n", encoding="utf-8")
-            (out_text_dir / "dich_nghia.txt").write_text("\n".join(text_sach_dn) + "\n", encoding="utf-8")
+            if not is_resume:
+                (out_viet_dir / "Label.txt").write_text("\n".join(viet_label_lines) + "\n", encoding="utf-8")
+                (out_viet_dir / "fileState.txt").write_text("\n".join(viet_filestate_lines) + "\n", encoding="utf-8")
+                (out_han_dir / "Label.txt").write_text("\n".join(han_label_lines) + "\n", encoding="utf-8")
+                (out_han_dir / "fileState.txt").write_text("\n".join(han_filestate_lines) + "\n", encoding="utf-8")
+                (out_text_dir / "han.txt").write_text("\n".join(text_sach_han) + "\n", encoding="utf-8")
+                (out_text_dir / "phien_am.txt").write_text("\n".join(text_sach_pa) + "\n", encoding="utf-8")
+                (out_text_dir / "dich_nghia.txt").write_text("\n".join(text_sach_dn) + "\n", encoding="utf-8")
         
     # Ghi file Label.txt, fileState.txt và 03_text_sach (tự động append nếu chạy theo từng cụm trang)
     def append_or_write(filepath, new_lines):
-        if filepath.exists() and start_p > 4:
+        if filepath.exists() and is_resume:
             with open(filepath, "a", encoding="utf-8") as f:
                 f.write("\n".join(new_lines) + "\n")
         else:

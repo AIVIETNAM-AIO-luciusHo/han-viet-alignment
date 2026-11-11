@@ -20,7 +20,8 @@ from PIL import Image
 _MARGIN_TOP_RATIO = 0.075   # bỏ 7.5% trên (header "SẮC PHONG LƯU TẠI…")
 _MARGIN_BOT_RATIO = 0.955   # giữ đến 95.5% chiều cao (bỏ footer số trang)
 _MARGIN_L_RATIO   = 0.020   # bỏ 2% trái
-_MARGIN_R_RATIO   = 0.985   # giữ đến 98.5% chiều rộng
+_MARGIN_R_RATIO   = 0.985   # giữ đến 98.5% chiều rộng (vùng Hán)
+_MARGIN_VIET_R_RATIO = 0.998  # giữ sát mép phải 99.8% cho vùng Quốc ngữ để không cắt mất chữ cuối dòng
 
 
 def _margins(h: int, w: int):
@@ -182,6 +183,7 @@ def process_and_crop_page(
     h, w = arr.shape[:2]
 
     mt, mb, ml, mr = _margins(h, w)
+    mr_viet = int(w * _MARGIN_VIET_R_RATIO)
 
     layout = detect_layout(str(img_path))
     docs   = []
@@ -195,7 +197,7 @@ def process_and_crop_page(
         viet_file = out_viet_dir / f"{doc_id}_1.jpg"
 
         img.crop((ml, mt, mr, sy)).save(han_file,  quality=95)
-        img.crop((ml, sy, mr, mb)).save(viet_file, quality=95)
+        img.crop((ml, sy, mr_viet, mb)).save(viet_file, quality=95)
 
         docs.append({
             "doc_id":   doc_id,
@@ -221,10 +223,10 @@ def process_and_crop_page(
 
         # Tờ 1: trái trên / phải trên
         img.crop((ml, mt, sx, sy)).save(han1_file,  quality=95)
-        img.crop((sx, mt, mr, sy)).save(viet1_file, quality=95)
+        img.crop((sx, mt, mr_viet, sy)).save(viet1_file, quality=95)
         # Tờ 2: trái dưới / phải dưới
         img.crop((ml, sy, sx, mb)).save(han2_file,  quality=95)
-        img.crop((sx, sy, mr, mb)).save(viet2_file, quality=95)
+        img.crop((sx, sy, mr_viet, mb)).save(viet2_file, quality=95)
 
         docs.append({
             "doc_id":   doc1_id,

@@ -14,6 +14,7 @@ def simplified_in(han: str) -> list[str]:
     """Chữ giản thể (do OCR sinh ra) trong ô han, kèm gợi ý phồn thể: ['钱→錢', '发→發/髮']."""
     return [f"{c}→{'/'.join(t)}" for c in dict.fromkeys(han) if (t := simplified_only(c))]
 from .han_pa import learn_memory, match_score, reading_stats, split_han
+from .clause import refine_pair
 from .pa_dn import pair_risks
 from .pa_dn import align_sentences
 from .segment import split_dich_nghia, split_phien_am
@@ -95,8 +96,9 @@ def build_memory(docs: list[DocInput], readings: Readings, clean: bool = True) -
 
 def align_document(doc: DocInput, readings: Readings, default_doc_type: str = "sac_phong",
                    clean: bool = True, memory: PhraseMemory | None = None,
-                   correct: bool = True, mask: bool = True) -> tuple[list[dict], list[dict]]:
-    """correct: sửa lỗi OCR có bằng chứng; mask: chữ Hán OCR lệch âm không sửa được -> □ (xem correction.py)."""
+                   correct: bool = True, mask: bool = True, refine: bool = True) -> tuple[list[dict], list[dict]]:
+    """correct: sửa lỗi OCR có bằng chứng; mask: chữ Hán OCR lệch âm không sửa được -> □ (xem correction.py).
+    refine: tách tiếp mỗi cặp câu thành cặp mệnh đề nhỏ nhất (clause.py, HD 3.1)."""
     han, pa, dn = _clean(doc, readings, clean)
     if correct and memory is None:
         memory = build_memory([doc], readings, clean)
@@ -113,6 +115,15 @@ def align_document(doc: DocInput, readings: Readings, default_doc_type: str = "s
 
     row_pa = [" ".join(pa_sents[i] for i in b[0]) for b in beads]
     row_dn = [" ".join(dn_sents[j] for j in b[1]) if b[1] else DN_MISSING for b in beads]
+    if refine and has_dn:
+        r_pa, r_dn, r_beads = [], [], []
+        for p, d, b in zip(row_pa, row_dn, beads):
+            parts = refine_pair(p, d) if d != DN_MISSING else [(p, d)]
+            for pp, dd in parts:
+                r_pa.append(pp)
+                r_dn.append(dd)
+                r_beads.append(b if len(parts) == 1 else ([0], [0]))
+        row_pa, row_dn, beads = r_pa, r_dn, r_beads
     split = split_han(han, row_pa, readings, memory, correct, mask) if row_pa else None
     if split:
         row_pa = split.pa_rows

@@ -333,10 +333,25 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
 #   + cặp chữ liền nhau khớp cặp âm tiết của câu j (tên riêng, chức quan: 兵部 ↔ Bộ Binh)
 #   + dòng niên hiệu chỉ ghép với câu niên hiệu cùng năm
 #   − lệch độ dài (Gale–Church) ; + ranh giới tự nhiên (đầu đoạn/cột, 也 矣, 帝曰…: _cut_bonus)
+#   + khớp mép: 3 chữ sau điểm cắt ↔ âm tiết đầu câu sau, 3 chữ trước ↔ âm tiết cuối câu trước (âm Hán-Việt
+#     hoặc từ dịch quen thuộc EDGE_EQ: "Vua dụ rằng" ↔ 帝諭…曰, "… tâu lên" ↔ …以聞)
 # Mỗi điểm cắt có "biên độ" = chi phí tăng thêm khi dời nó > 2 chữ (giữ hai cắt bên cạnh). Biên độ thấp = mơ hồ:
 # gộp hai câu kề vào một cặp (gộp vẫn đúng nghĩa, cắt sai thì cả hai cặp sai).
 
-GLOBAL = dict(w_uni=0.6, w_bi=1.2, w_len=0.7, w_cut=0.7, W=150, empty=5.0, year=3.0, fold=0.7)
+# w_cut, w_edge chọn trên nhãn ranh giới docs/danh_gia_minh_menh (354 điểm cắt): cắt đúng ±2 chữ 82.5% -> 88.7%.
+GLOBAL = dict(w_uni=0.6, w_bi=1.2, w_len=0.7, w_cut=1.2, W=150, empty=5.0, year=3.0, fold=0.7,
+              w_edge=1.0)
+
+# Từ dịch quen thuộc ở đầu/cuối câu không trùng âm Hán-Việt với chữ Hán tương ứng (khóa đã bỏ dấu, _fold):
+# "Vua dụ rằng" ↔ 帝諭…曰, "Trẫm" ↔ 朕, "… tâu lên" ↔ …以聞, "Vua ưng cho" ↔ 許之/從之.
+EDGE_EQ = {
+    "vua": "帝上", "tram": "朕", "tau": "奏言聞", "du": "諭", "bao": "謂諭", "phan": "曰諭", "rang": "曰",
+    "khien": "命令", "sai": "命令遣", "xin": "請乞", "cho": "許準允從可", "ung": "許準允", "chuan": "準許",
+    "theo": "從", "khen": "嘉奬賞", "thuong": "賞", "moi": "初", "truoc": "先初", "lai": "又復", "quan": "臣",
+    "ban": "賜諭頒", "nay": "今玆", "neu": "如若儻", "phai": "是宜", "vay": "也矣", "duoc": "得",
+}
+EDGE_N = 5          # số âm tiết đầu/cuối câu dịch đem so
+EDGE_POS = (1.0, 0.6, 0.3)  # trọng số chữ Hán thứ 1, 2, 3 tính từ điểm cắt
 
 
 def _fold(key: str) -> str:
@@ -430,6 +445,35 @@ def align_stream(st: Stream, sents: list[VietSentence], rough: list[int], readin
     var = 1.5 * ratio
     INF = 1e18
 
+    # Khớp mép: chữ Hán ngay sau điểm cắt ↔ âm tiết đầu câu sau, chữ ngay trước ↔ âm tiết cuối câu trước.
+    def edge_sets(keys: list[str]) -> tuple[set, set, set]:
+        f = {_fold(x) for x in keys}
+        return set(keys), f, {c for x in f for c in EDGE_EQ.get(x, "")}
+
+    heads, tails = [], []
+    for s in sents:
+        ks = [k for k in _vkeys(s.text) if k[:-1].isalpha()]
+        heads.append(edge_sets(ks[:EDGE_N]))
+        tails.append(edge_sets(ks[-EDGE_N:]))
+
+    def hit(p: int, sets: tuple[set, set, set]) -> bool:
+        return bool(K[p] & sets[0] or KF[p] & sets[1] or text[p] in sets[2])
+
+    def edge(j: int, ps: np.ndarray) -> np.ndarray:
+        """Điểm khớp mép cho điểm cắt j (giữa câu j-1 và câu j) tại các vị trí ps."""
+        out = np.zeros(len(ps))
+        if not P["w_edge"] or j <= 0 or j >= m:
+            return out
+        for t, p in enumerate(ps):
+            sc = 0.0
+            for d, w in enumerate(EDGE_POS):
+                if p + d < n and hit(p + d, heads[j]):
+                    sc += w
+                if p - 1 - d >= 0 and hit(p - 1 - d, tails[j - 1]):
+                    sc += w
+            out[t] = sc
+        return out
+
     def emis(j: int, a: int, b: int) -> np.ndarray:
         e = np.zeros(b - a)
         for p in range(a, b):
@@ -456,6 +500,7 @@ def align_stream(st: Stream, sents: list[VietSentence], rough: list[int], readin
     best: list = [None] * (m + 1)
     arg: list = [None] * (m + 1)
     Es: list = [None] * (m + 1)
+    edges: list = [None] * (m + 1)
     best[0] = np.array([0.0])
     for j in range(1, m + 1):
         a = lo[j - 1]
@@ -473,7 +518,8 @@ def align_stream(st: Stream, sents: list[VietSentence], rough: list[int], readin
         k = np.argmin(tot, axis=1)
         bj = tot[np.arange(len(ps)), k]
         if j < m:
-            bj = bj - P["w_cut"] * bonus[ps]
+            edges[j] = edge(j, ps)
+            bj = bj - P["w_cut"] * bonus[ps] - P["w_edge"] * edges[j]
         best[j], arg[j] = bj, p0s[k]
     cuts, p = [n], n
     for j in range(m, 0, -1):
@@ -496,7 +542,8 @@ def align_stream(st: Stream, sents: list[VietSentence], rough: list[int], readin
         a_, c, b_ = cuts[j - 1], cuts[j], cuts[j + 1]
 
         def f(x: int) -> float:
-            return seg(j - 1, a_, x) + seg(j, x, b_) - P["w_cut"] * bonus[x]
+            return (seg(j - 1, a_, x) + seg(j, x, b_) - P["w_cut"] * bonus[x]
+                    - P["w_edge"] * edges[j][x - lo[j]])
         fc = f(c)
         alt = [f(x) for x in range(max(a_, lo[j]), min(b_, hi[j]) + 1) if abs(x - c) > 2]
         margins.append(min(alt) - fc if alt else 9.0)

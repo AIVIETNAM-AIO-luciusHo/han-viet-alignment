@@ -17,10 +17,16 @@ Cách dùng:
 
     # 3. Chỉ chạy kiểm tra trên file hiện có
     python dong_hang.py --ma-sach R1001 --check-only
+
+    # 4. Tách file đã có (giữ bản sửa tay) thành cặp mệnh đề nhỏ nhất (tại , ; :)
+    python dong_hang.py --ma-sach R1001 --tach-menh-de
 """
 from __future__ import annotations
 
 import argparse
+import csv
+import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -33,7 +39,8 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from han_viet_alignment.alignment.cleaning import clean_han, clean_phien_am  # noqa: E402
-from han_viet_alignment.alignment.han_pa import match_score  # noqa: E402
+from han_viet_alignment.alignment.han_pa import match_score, reading_stats  # noqa: E402
+from han_viet_alignment.alignment.refine_rows import renumber, split_row  # noqa: E402
 from han_viet_alignment.alignment.pipeline import (  # noqa: E402
     COLUMNS, REVIEW_COLUMNS, DocInput, align_document, build_memory, summarize)
 from han_viet_alignment.common.dictionary import DEFAULT_DICT, load_readings  # noqa: E402
@@ -108,6 +115,55 @@ def print_summary(s: dict) -> None:
               f"{len(rows)} dòng — {', '.join(rows[:15])}" + (" ..." if len(rows) > 15 else ""))
 
 
+def tach_menh_de(tsv: Path, xlsx: Path, ma: str, readings) -> list[dict]:
+    """Tách từng dòng của file đã có thành cặp mệnh đề; giữ nội dung sửa tay, đánh lại sent_id, chuyển trạng
+    thái duyệt (fix_ui) và review.tsv sang id mới. Bản cũ lưu ở workspace/<MA_SACH>/truoc_tach_menh_de/."""
+    rows = read_edited(tsv)
+    ws = ROOT / "workspace" / ma
+    bak = ws / "truoc_tach_menh_de"
+    bak.mkdir(parents=True, exist_ok=True)
+    review_json = tsv.parent / f"{ma}_review.json"
+    review_tsv = ws / "review.tsv"
+    for f in (tsv, xlsx, review_json, review_tsv):
+        if f.exists():
+            shutil.copy2(f, bak / f.name)
+    split: list[dict] = []
+    for r in rows:
+        split.extend(split_row(r, readings))
+    new_rows, mapping = renumber(split)
+
+    if review_json.exists():  # dòng con thừa hưởng trạng thái duyệt của dòng cha
+        old = json.loads(review_json.read_text(encoding="utf-8"))
+        new = {nid: v for sid, v in old.items() for nid in mapping.get(sid, [sid])}
+        review_json.write_text(json.dumps(new, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+    if review_tsv.exists():  # cảnh báo thừa hưởng từ dòng cha, số liệu chữ–âm tính lại
+        with review_tsv.open(encoding="utf-8") as f:
+            old_rv = {r["sent_id"]: r for r in csv.DictReader(f, delimiter="	", quoting=csv.QUOTE_NONE)}
+        by_new = {nid: sid for sid, ids in mapping.items() for nid in ids}
+        review = []
+        for r in new_rows:
+            parent = old_rv.get(by_new[r["sent_id"]], {})
+            n_han, n_syl, ok, counted, bad = reading_stats(r["han"], r["phien_am"], readings)
+            warns = [w for w in parent.get("canh_bao", "").split() if not w.startswith(("LECH_SO_CHU", "KHOP_AM"))]
+            if n_han != n_syl:
+                warns.append(f"LECH_SO_CHU({n_han}/{n_syl})")
+            elif counted and ok / counted < 0.95:
+                warns.append("KHOP_AM_DUOI_95")
+            review.append({"sent_id": r["sent_id"], "co": "x" if warns else "", "so_chu_han": str(n_han),
+                           "so_am_tiet": str(n_syl), "khop_am": f"{ok}/{counted}" if n_han == n_syl else "",
+                           "chu_lech": "; ".join(bad), "canh_bao": " ".join(warns)})
+        write_tsv(review_tsv, review, REVIEW_COLUMNS)
+    write_tsv(ws / "tach_menh_de_map.tsv",
+              [{"sent_id_cu": s, "sent_id_moi": " ".join(ids)} for s, ids in mapping.items()],
+              ["sent_id_cu", "sent_id_moi"])
+    write_tsv(tsv, new_rows, COLUMNS)
+    write_xlsx(xlsx, new_rows, COLUMNS)
+    print(f"[✓] Tách mệnh đề: {len(rows)} -> {len(new_rows)} cặp "
+          f"({sum(1 for ids in mapping.values() if len(ids) > 1)} dòng được tách). Bản cũ: {bak}")
+    print(f"    Ánh xạ sent_id cũ -> mới: {ws / 'tach_menh_de_map.tsv'}")
+    return new_rows
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Dóng hàng Hán – phiên âm – dịch nghĩa và xuất TSV/XLSX")
     ap.add_argument("--ma-sach", required=True, help="Mã sách, vd R1001")
@@ -119,6 +175,10 @@ def main() -> None:
     ap.add_argument("--force", action="store_true", help="Cho phép ghi đè 04_dong_hang đã có (MẤT bản sửa tay)")
     ap.add_argument("--sync", choices=["xlsx", "tsv"], help="Đọc bản đã sửa tay, chuẩn hóa rồi ghi lại cả TSV và XLSX")
     ap.add_argument("--check-only", action="store_true", help="Chỉ kiểm tra file hiện có")
+    ap.add_argument("--tach-menh-de", action="store_true",
+                    help="Tách file đã có (giữ sửa tay) thành cặp mệnh đề nhỏ nhất tại , ; : rồi ghi lại TSV + XLSX")
+    ap.add_argument("--theo-cau", action="store_true",
+                    help="Khi tạo bản nháp: chỉ dóng cấp câu (. ! ?), không tách tiếp thành mệnh đề")
     ap.add_argument("--no-check", action="store_true", help="Không chạy script kiểm tra của giáo viên")
     ap.add_argument("--no-correct", action="store_true",
                     help="Không tự sửa lỗi OCR (chữ Hán gần giống/cụm từ lặp, âm tiết phiên âm hỏng)")
@@ -139,6 +199,11 @@ def main() -> None:
 
     if args.check_only:
         sys.exit(run_checker(tsv, xlsx, Path(args.dict)))
+
+    if args.tach_menh_de:
+        rows = tach_menh_de(tsv, xlsx, ma, readings)
+        print_summary(summarize(rows, readings))
+        sys.exit(0 if args.no_check else run_checker(tsv, xlsx, Path(args.dict)))
 
     if args.sync:
         src = xlsx if args.sync == "xlsx" else tsv
@@ -163,7 +228,7 @@ def main() -> None:
     rows, review = [], []
     for d in docs:
         r, rv = align_document(d, readings, args.doc_type, memory=memory,
-                               correct=not args.no_correct, mask=not args.no_mask)
+                               correct=not args.no_correct, mask=not args.no_mask, refine=not args.theo_cau)
         rows.extend(r)
         review.extend(rv)
         flagged = sum(1 for x in rv if x["co"])

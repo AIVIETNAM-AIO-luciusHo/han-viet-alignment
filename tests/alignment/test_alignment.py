@@ -202,7 +202,7 @@ class HanFilterTests(unittest.TestCase):
 
 class PipelineTests(unittest.TestCase):
     def test_rows_follow_contract(self):
-        rows, review = align_document(DOC, READ)
+        rows, review = align_document(DOC, READ, refine=False)
         self.assertEqual([r["han"] for r in rows], ["敕神其相佑保我黎民", "欽哉", "嗣德柒年拾月拾壹日"])
         self.assertEqual(rows[1]["dich_nghia"], "Kính cẩn thay!")
         self.assertTrue(rows[2]["dich_nghia"].endswith("(1854)"))
@@ -212,10 +212,34 @@ class PipelineTests(unittest.TestCase):
 
     def test_no_han_never_collapses_document(self):
         # OCR không ra chữ Hán nào: vẫn tách câu, mỗi chữ ghi □, có ghi_chu (mục 3.1: không gộp cả văn bản)
-        rows, _ = align_document(DocInput("R9999.002", "", DOC.phien_am, DOC.dich_nghia), READ)
+        rows, _ = align_document(DocInput("R9999.002", "", DOC.phien_am, DOC.dich_nghia), READ, refine=False)
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[1]["han"], "□□")
         self.assertIn("□", rows[1]["ghi_chu"])
+
+    def test_refine_splits_clauses(self):
+        # HD 3.1: đơn vị nhỏ nhất — mệnh đề ngăn bởi dấu phẩy được tách khi hai vế tương ứng rõ ràng
+        rows, _ = align_document(DOC, READ)
+        self.assertEqual([r["han"] for r in rows], ["敕神其相佑", "保我黎民", "欽哉", "嗣德柒年拾月拾壹日"])
+        self.assertEqual([r["sent_id"] for r in rows], [f"R9999.001.{k}" for k in range(1, 5)])
+
+    def test_refine_merges_reordered_lists(self):
+        from han_viet_alignment.alignment.clause import refine_pair
+        # bản dịch đảo trật tự địa danh: không được tách chéo
+        out = refine_pair("Sắc Hưng Yên tỉnh, Khoái Châu phủ, Đại Ích ấp phụng sự.",
+                          "Sắc ban cho ấp Đại Ích, phủ Khoái Châu, tỉnh Hưng Yên thờ phụng.")
+        self.assertEqual(len(out), 1)
+
+    def test_split_existing_row_keeps_content_and_notes(self):
+        from han_viet_alignment.alignment.refine_rows import split_row
+        row = {"sent_id": "R9999.001.1", "doc_id": "R9999.001", "doc_type": "sac_phong",
+               "han": "敕神其□佑保我黎民", "phien_am": "Sắc. Thần kỳ tướng hựu, bảo ngã lê dân.",
+               "dich_nghia": "Sắc. Mong thần hãy phù hộ, che chở dân ta.",
+               "ghi_chu": "1 chữ Hán OCR sai (không khớp âm: 相≠tướng), ghi □; cần đối chiếu ảnh gốc."}
+        subs = split_row(row, READ)
+        self.assertEqual([s["han"] for s in subs], ["敕神其□佑", "保我黎民"])
+        self.assertIn("相≠tướng", subs[0]["ghi_chu"])
+        self.assertEqual(subs[1]["ghi_chu"], "")
 
     def test_missing_translation_marked(self):
         rows, _ = align_document(DocInput("R9999.003", DOC.han, DOC.phien_am, ""), READ)
@@ -252,11 +276,35 @@ class TeacherSampleTests(unittest.TestCase):
         gold = pd.read_csv(MAU, sep="\t", dtype=str, keep_default_na=False, quoting=3)
         for doc, g in gold.groupby("doc_id", sort=False):
             d = DocInput(doc, "".join(g.han), " ".join(g.phien_am), " ".join(g.dich_nghia))
-            rows, _ = align_document(d, readings)
+            rows, _ = align_document(d, readings, refine=False)
             self.assertEqual(len(rows), len(g), doc)
             for gr, pr in zip(g.to_dict("records"), rows):
                 for c in ("sent_id", "han", "phien_am", "dich_nghia", "doc_type"):
                     self.assertEqual(pr[c], gr[c], f"{gr['sent_id']} {c}")
+
+    def test_clause_rows_never_cross_sample_sentences(self):
+        # Tách mệnh đề: mỗi dòng con phải nằm gọn trong một cặp mẫu, ghép lại đúng cặp mẫu
+        import pandas as pd
+        from han_viet_alignment.common.dictionary import load_readings
+        readings = load_readings(DICT)
+        gold = pd.read_csv(MAU, sep="	", dtype=str, keep_default_na=False, quoting=3)
+        total = 0
+        for doc, g in gold.groupby("doc_id", sort=False):
+            d = DocInput(doc, "".join(g.han), " ".join(g.phien_am), " ".join(g.dich_nghia))
+            rows, _ = align_document(d, readings)
+            total += len(rows)
+            k = 0
+            for gr in g.to_dict("records"):
+                han, pa, dn = "", [], []
+                while han != gr["han"]:
+                    self.assertLess(k, len(rows), gr["sent_id"])
+                    han += rows[k]["han"]
+                    pa.append(rows[k]["phien_am"])
+                    dn.append(rows[k]["dich_nghia"])
+                    k += 1
+                self.assertEqual(" ".join(pa), gr["phien_am"], gr["sent_id"])
+                self.assertEqual(" ".join(dn), gr["dich_nghia"], gr["sent_id"])
+        self.assertGreater(total, 1.5 * len(gold))
 
 
 if __name__ == "__main__":

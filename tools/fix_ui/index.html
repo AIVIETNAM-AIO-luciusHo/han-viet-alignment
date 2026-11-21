@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sửa chữ Hán</title>
+<style>
+:root{--bg:#f6f5f2;--panel:#fff;--line:#dedbd3;--ink:#1d1c1a;--muted:#77736b;--accent:#b4462b;--accent-bg:#fbe9e3;--ok:#2f7a4b;--ok-bg:#e3f2e8;--warn:#a86b00;--miss:#fff3c4}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--panel:#24221f;--line:#3a3732;--ink:#ece8df;--muted:#9a958b;--accent:#ff8a65;--accent-bg:#43251d;--ok:#7ccf98;--ok-bg:#1f3a28;--warn:#e0a640;--miss:#4a3f12}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,"Segoe UI",sans-serif;display:flex;flex-direction:column}
+.han{font-family:"Noto Serif CJK TC","Noto Serif TC","Source Han Serif TC","MingLiU","PMingLiU","SimSun-ExtB","SimSun",serif}
+header{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+header b{font-size:15px}
+select,input,button,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+button{cursor:pointer}button:hover{border-color:var(--accent)}
+.muted{color:var(--muted)}
+.tabs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tabs button{border:0;border-radius:0;background:transparent;padding:5px 12px}
+.tabs button.on{background:var(--accent);color:#fff}
+main{flex:1;display:grid;grid-template-columns:300px minmax(380px,1fr) minmax(380px,1fr);min-height:0}
+section{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+section>h3{margin:0;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.scroll{overflow:auto;flex:1;padding:10px 12px}
+/* col 1 */
+.sylbar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.sylbar input{flex:1;min-width:0}
+.cur{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px;background:var(--panel)}
+.cur .big{font-size:40px;line-height:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
+.cand{position:relative;border:1px solid var(--line);border-radius:6px;background:var(--panel);text-align:center;padding:4px 2px 2px;cursor:pointer}
+.cand:hover{border-color:var(--accent);background:var(--accent-bg)}
+.cand .c{font-size:28px;line-height:1.15}
+.cand .f{font-size:10px;color:var(--muted)}
+.cand .k{position:absolute;top:1px;left:4px;font-size:10px;color:var(--accent)}
+.cand.sim{border-color:var(--warn)}
+.cand.sim::after{content:"≈";position:absolute;top:0;right:4px;font-size:11px;color:var(--warn)}
+.sub{margin:12px 0 6px;font-size:12px;color:var(--muted)}
+table.cmp{width:100%;border-collapse:collapse;font-size:13px}
+table.cmp td{border-bottom:1px solid var(--line);padding:3px 4px;vertical-align:top}
+table.cmp td.h{font-size:20px;width:30px}
+table.cmp tr.bad td{background:var(--accent-bg)}
+.rd{display:inline-block;margin:1px 2px;padding:0 5px;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px}
+.rd:hover{border-color:var(--accent)}
+/* col 2 */
+.sent{margin-bottom:14px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.sent.active{border-color:var(--accent)}
+.sent.done{border-left:4px solid var(--ok)}
+.sid{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.vbtn{font-size:11px;padding:1px 8px}
+.vbtn.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.warn{color:var(--warn)}
+.cells{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+.cell{width:46px;border:1px solid var(--line);border-radius:5px;text-align:center;cursor:pointer;background:var(--bg);padding:2px 0}
+.cell .c{font-size:24px;line-height:1.2}
+.cell .s{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.cell.miss{background:var(--miss)}
+.cell.bad .s{color:var(--accent);font-weight:600}
+.cell.fixed{background:var(--ok-bg)}
+.cell.sel{outline:2px solid var(--accent);outline-offset:1px}
+.cell.p{width:auto;min-width:18px;border-style:dashed;cursor:default}
+.pa{font-size:12px;color:var(--muted)}
+.note{font-size:11px;color:var(--warn);margin-top:4px}
+.hanline{font-size:18px;margin:4px 0;word-break:break-all}
+.lbl{font-size:11px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between}
+textarea{width:100%;resize:vertical;min-height:2.6em;line-height:1.45;font-size:14px;background:var(--bg)}
+textarea.dirty{border-color:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:2px;margin:2px 0}
+.chip{font-size:11px;padding:0 4px;border-radius:3px;color:var(--muted)}
+.chip.bad{background:var(--accent-bg);color:var(--accent);font-weight:600}
+/* col 3 */
+#view{position:relative;flex:1;overflow:hidden;background:#000;cursor:grab}
+#view.drag{cursor:grabbing}
+#stage{position:absolute;top:0;left:0;transform-origin:0 0}
+#stage img{display:block;user-select:none;-webkit-user-drag:none}
+#stage svg{position:absolute;inset:0;pointer-events:none}
+#stage polygon{fill:none;stroke:rgba(80,160,255,.3);stroke-width:3}
+#stage polygon.hit{fill:rgba(255,120,60,.06);stroke:#ff6a3d;stroke-width:4}
+#stage polygon.charhit{fill:rgba(255,120,60,.12);stroke:#ff6a3d;stroke-width:4}
+textarea.pa-edit{font-size:13px;min-height:2.2em;margin-top:2px}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:6px 14px;border-radius:6px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+kbd{border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <b>Hiệu đính</b><span id="book" class="muted"></span>
+  <div class="tabs"><button data-mode="pa_dn">1. Phiên âm &amp; Dịch nghĩa</button><button data-mode="han">2. Chữ Hán</button></div>
+  <button id="prevDoc" title="Văn bản trước">◀</button>
+  <select id="docSel"></select>
+  <button id="nextDoc" title="Văn bản sau">▶</button>
+  <label class="muted"><input type="checkbox" id="onlyTodo" checked> chỉ văn bản chưa xong</label>
+  <button id="nextMiss" class="m-han">Ô □ kế tiếp <kbd>N</kbd></button>
+  <span id="help" class="muted" style="margin-left:auto"></span>
+</header>
+<main>
+  <section>
+    <h3 id="c1title">Từ điển</h3>
+    <div class="scroll" id="col1"></div>
+  </section>
+  <section>
+    <h3 id="c2title">Câu <span id="docStat" class="muted" style="text-transform:none;letter-spacing:0"></span></h3>
+    <div class="scroll" id="col2"></div>
+  </section>
+  <section>
+    <h3>Ảnh gốc
+      <span style="margin-left:auto;display:flex;gap:4px;text-transform:none;letter-spacing:0">
+        <button id="imgHan">Hán</button><button id="imgViet">Việt</button>
+        <button id="zIn">+</button><button id="zOut">−</button><button id="zFit">Vừa</button>
+      </span>
+    </h3>
+    <div id="view"><div id="stage"><img id="img" alt=""><svg id="ov"></svg></div></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const isHan = ch => { const c = ch.codePointAt(0); return (c>=0x3400&&c<=0x4DBF)||(c>=0x4E00&&c<=0x9FFF)||(c>=0xF900&&c<=0xFAFF)||(c>=0x20000&&c<=0x3FFFF); };
+const sylKey = s => { let t='0', b=''; for (const c of s.toLowerCase().trim().normalize('NFD')) { const m={'̀':'2','́':'1','̃':'4','̉':'3','̣':'5'}[c]; if (m) t=m; else b+=c; } return b.normalize('NFC')+t; };
+// âm tiết = chuỗi chữ/số/□ (giống syllables() bên Python: bỏ dấu câu rồi tách khoảng trắng)
+const SYL_RE = /[\p{L}\p{M}\p{N}_□]+/gu;
+const sylls = t => t.normalize('NFC').match(SYL_RE) || [];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const S = { info:null, doc:null, mode:'pa_dn', sel:null, act:0, shift:{}, draftPa:{}, fixed:new Set(), img:'viet', cands:[], z:{s:1,x:0,y:0} };
+try { S.mode = localStorage.getItem('fixui.mode') || 'pa_dn'; } catch(e){}
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
+  return r.json();
+}
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),1600); }
+const charCache = {};
+async function charInfo(ch){ if(!charCache[ch]) charCache[ch]=await api('/api/char?ch='+encodeURIComponent(ch)); return charCache[ch]; }
+const hanUnits = han => [...han].filter(c=>isHan(c)||c==='□');
+
+// ---------- mode ----------
+const HELP = {
+  pa_dn: '<kbd>Ctrl</kbd>+<kbd>Enter</kbd> lưu + duyệt + câu sau · <kbd>Alt</kbd>+<kbd>↑↓</kbd> đổi câu · <kbd>Esc</kbd> hoàn tác ô',
+  han: '<kbd>←</kbd><kbd>→</kbd> di chuyển · <kbd>1</kbd>–<kbd>9</kbd> chọn · <kbd>⌫</kbd> đặt □ · <kbd>Del</kbd> xóa ô · <kbd>[</kbd><kbd>]</kbd> lệch âm · <kbd>V</kbd> duyệt câu · ô phiên âm: <kbd>Enter</kbd> lưu, <kbd>Esc</kbd> hoàn tác',
+};
+function setMode(m){
+  if (!confirmLeave()) return;
+  S.mode=m; try{ localStorage.setItem('fixui.mode',m); }catch(e){}
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
+  document.querySelectorAll('.m-han').forEach(b=>b.style.display = m==='han'?'':'none');
+  $('#help').innerHTML = HELP[m];
+  $('#c1title').textContent = m==='han' ? 'Từ điển' : 'Đối chiếu âm Hán – phiên âm';
+  $('#c2title').firstChild.textContent = m==='han' ? 'Hán – phiên âm ' : 'Phiên âm & dịch nghĩa ';
+  S.img = m==='han' ? 'han' : 'viet';
+  S.sel=null;
+  if (S.doc){ renderDocSel(); render(); loadImage(); if (m==='han') gotoNextMiss(true); else activate(firstTodo()); }
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
+// ---------- docs ----------
+const docTodo = d => S.mode==='han' ? d.missing>0 : d.done.pa_dn < d.sents;
+function renderDocSel() {
+  const only = $('#onlyTodo').checked, cur = S.doc && S.doc.doc_id;
+  const docs = S.info.docs.filter(d => !only || docTodo(d) || d.doc_id===cur);
+  $('#docSel').innerHTML = docs.map(d => {
+    const st = S.mode==='han' ? `${d.missing} □ · ✓${d.done.han}/${d.sents}` : `✓${d.done.pa_dn}/${d.sents} câu`;
+    return `<option value="${d.doc_id}" ${d.doc_id===cur?'selected':''}>${d.doc_id} — ${st}</option>`;
+  }).join('');
+}
+function confirmLeave(){
+  if (document.querySelector('#col2 textarea.dirty')) return confirm('Có ô chưa lưu. Bỏ thay đổi?');
+  return true;
+}
+async function loadDoc(id) {
+  if (!confirmLeave()) { renderDocSel(); return; }
+  S.doc = await api('/api/doc?id='+encodeURIComponent(id));
+  S.sel = null; S.shift = {}; S.draftPa = {}; S.act = 0;
+  try { localStorage.setItem('fixui.doc', id); } catch(e){}
+  renderDocSel(); render(); loadImage();
+  if (S.mode==='han') gotoNextMiss(true); else activate(firstTodo());
+}
+function stepDoc(d) {
+  const opts=[...$('#docSel').options], i=opts.findIndex(o=>o.value===S.doc.doc_id);
+  const o=opts[i+d]; if (o) loadDoc(o.value);
+}
+function syncDocStats(){
+  const d=S.info.docs.find(x=>x.doc_id===S.doc.doc_id);
+  d.missing = S.doc.sents.reduce((n,s)=>n+[...s.han].filter(c=>c==='□').length,0);
+  d.done.pa_dn = S.doc.sents.filter(s=>s.review.pa_dn).length;
+  d.done.han = S.doc.sents.filter(s=>s.review.han).length;
+  renderDocSel();
+  $('#docStat').textContent = S.mode==='han' ? `· còn ${d.missing} □ · duyệt ${d.done.han}/${d.sents}` : `· duyệt ${d.done.pa_dn}/${d.sents}`;
+}
+function render(){ S.mode==='han' ? renderHan() : renderPaDn(); syncDocStats(); }
+
+async function toggleReview(si){
+  const s=S.doc.sents[si], done=!s.review[S.mode];
+  const r=await api('/api/review',{sent_id:s.sent_id, mode:S.mode, done});
+  if(!r.ok) return toast('Lỗi: '+r.error);
+  s.review=r.sent.review;
+  const card=$('#sent'+si); card.classList.toggle('done',done);
+  const b=card.querySelector('.vbtn'); b.classList.toggle('on',done); b.textContent=done?'✓ đã duyệt':'Duyệt';
+  syncDocStats();
+}
+const vbtn = (s,si) => `<button class="vbtn ${s.review[S.mode]?'on':''}" data-rev="${si}">${s.review[S.mode]?'✓ đã duyệt':'Duyệt'}</button>`;
+$('#col2').addEventListener('click', e=>{ const b=e.target.closest('[data-rev]'); if(b){ e.stopPropagation(); toggleReview(+b.dataset.rev); } }, true);
+
+// ================= MODE 1: phiên âm & dịch nghĩa =================
+const firstTodo = () => Math.max(0, S.doc.sents.findIndex(s=>!s.review.pa_dn));
+function badSyls(s){ // vị trí âm không khớp chữ Hán cùng vị trí
+  const u=hanUnits(s.han), y=sylls(s.phien_am), bad=new Set();
+  u.forEach((ch,k)=>{ if(ch==='□'||!y[k]) return; const info=charCache[ch]; if(info && !info.syls.some(r=>sylKey(r)===sylKey(y[k]))) bad.add(k); });
+  return bad;
+}
+async function prefetchChars(){
+  const need=[...new Set(S.doc.sents.flatMap(s=>hanUnits(s.han)).filter(c=>c!=='□'&&!charCache[c]))];
+  await Promise.all(need.map(charInfo));
+}
+function chipsHtml(s){
+  const bad=badSyls(s);
+  return sylls(s.phien_am).map((y,k)=>`<span class="chip ${bad.has(k)?'bad':''}">${esc(y)}</span>`).join('');
+}
+function renderPaDn(){
+  $('#col2').innerHTML = S.doc.sents.map((s,si)=>{
+    const nu=hanUnits(s.han).length, ny=sylls(s.phien_am).length;
+    return `<div class="sent ${s.review.pa_dn?'done':''} ${si===S.act?'active':''}" id="sent${si}" data-si="${si}">
+      <div class="sid"><span>${s.sent_id} · <span class="${nu!==ny?'warn':''}">${nu} chữ / ${ny} âm</span></span>${vbtn(s,si)}</div>
+      <div class="hanline han">${esc(s.han)}</div>
+      <div class="lbl"><span>Phiên âm</span></div>
+      <textarea data-f="phien_am" data-si="${si}" rows="2">${esc(s.phien_am)}</textarea>
+      <div class="chips" id="chips${si}">${chipsHtml(s)}</div>
+      <div class="lbl"><span>Dịch nghĩa</span></div>
+      <textarea data-f="dich_nghia" data-si="${si}" rows="3">${esc(s.dich_nghia)}</textarea>
+      ${s.ghi_chu?`<div class="note">${esc(s.ghi_chu)}</div>`:''}
+    </div>`;
+  }).join('');
+  prefetchChars().then(()=>{ if(S.mode!=='pa_dn') return; S.doc.sents.forEach((s,si)=>{ const c=$('#chips'+si); if(c) c.innerHTML=chipsHtml(s); }); renderCmp(); });
+}
+function activate(si, focus=true){
+  if(!S.doc.sents[si]) return;
+  S.act=si;
+  document.querySelectorAll('#col2 .sent.active').forEach(x=>x.classList.remove('active'));
+  const card=$('#sent'+si); if(!card) return;
+  card.classList.add('active'); card.scrollIntoView({block:'nearest'});
+  if (focus && S.mode==='pa_dn') { const t=card.querySelector('textarea'); if(document.activeElement?.closest('.sent')!==card) t.focus({preventScroll:true}); }
+  if (S.mode==='pa_dn'){ renderCmp(); highlightBox(); }
+}
+$('#col2').addEventListener('focusin', e=>{ const t=e.target.closest('textarea'); if(t){ if(+t.dataset.si!==S.act) activate(+t.dataset.si,false); else highlightBox(); } });
+$('#col2').addEventListener('input', e=>{
+  const t=e.target.closest('textarea'); if(!t) return;
+  const s=S.doc.sents[+t.dataset.si];
+  t.classList.toggle('dirty', t.value!==s[t.dataset.f]);
+  if (t.dataset.f!=='phien_am') return;
+  if (S.mode==='han') { if (t.value===s.phien_am) delete S.draftPa[+t.dataset.si]; else S.draftPa[+t.dataset.si]=t.value; updateCellSyls(+t.dataset.si); return; }
+  const tmp={...s, phien_am:t.value}; $('#chips'+t.dataset.si).innerHTML=chipsHtml(tmp); renderCmp(t.value);
+});
+$('#col2').addEventListener('focusout', e=>{ const t=e.target.closest('textarea'); if(t && t.classList.contains('dirty')) saveField(t); });
+async function saveField(t){
+  const si=+t.dataset.si, s=S.doc.sents[si], f=t.dataset.f;
+  if (t.value===s[f]) { t.classList.remove('dirty'); return true; }
+  const r=await api('/api/set_field',{sent_id:s.sent_id, field:f, value:t.value});
+  if(!r.ok){ toast('Lỗi: '+r.error); return false; }
+  Object.assign(s, r.sent); t.value=s[f]; t.classList.remove('dirty');
+  if (S.mode==='han' && f==='phien_am') {
+    delete S.draftPa[si]; updateCellSyls(si);
+    if (S.sel && S.sel.si===si) loadCands(sylOf(si, S.sel.k)); // âm mới -> gợi ý chữ mới
+  }
+  toast(`${s.sent_id}: đã lưu ${f==='phien_am'?'phiên âm':'dịch nghĩa'}`);
+  return true;
+}
+async function saveCard(si){ for (const t of document.querySelectorAll(`#sent${si} textarea`)) if(!(await saveField(t))) return false; return true; }
+
+// cột 1 (mode 1): bảng chữ Hán ↔ âm, click cách đọc để thay âm trong phiên âm
+function renderCmp(paOverride){
+  if (S.mode!=='pa_dn' || !S.doc) return;
+  const si=S.act, s=S.doc.sents[si]; if(!s) return;
+  const ta=document.querySelector(`#sent${si} textarea[data-f="phien_am"]`);
+  const pa = paOverride ?? (ta?ta.value:s.phien_am);
+  const u=hanUnits(s.han), y=sylls(pa), n=Math.max(u.length,y.length);
+  let rows='', nbad=0;
+  for(let k=0;k<n;k++){
+    const ch=u[k]||'', syl=y[k]||'', info=ch&&ch!=='□'?charCache[ch]:null;
+    const bad = info && syl && !info.syls.some(r=>sylKey(r)===sylKey(syl)); if(bad) nbad++;
+    const rds = info ? info.syls.slice(0,8).map(r=>`<span class="rd" data-k="${k}" data-r="${esc(r)}">${esc(r)}</span>`).join('') : '';
+    rows += `<tr class="${bad?'bad':''}"><td class="h han">${esc(ch)}</td><td>${esc(syl)||'<span class="warn">—</span>'}</td><td>${rds}</td></tr>`;
+  }
+  $('#col1').innerHTML = `<div class="sub" style="margin-top:0"><b>${s.sent_id}</b> · ${u.length} chữ / ${y.length} âm · <span style="color:var(--accent)">${nbad} âm lệch từ điển</span></div>
+    <div class="sub">Bấm một cách đọc để thay âm tương ứng trong ô phiên âm.</div>
+    <table class="cmp"><tbody>${rows}</tbody></table>`;
+}
+$('#col1').addEventListener('mousedown', e=>{ if(e.target.closest('.rd')) e.preventDefault(); }); // giữ focus ở ô phiên âm
+$('#col1').addEventListener('click', e=>{
+  const r=e.target.closest('.rd'); if(!r||S.mode!=='pa_dn') return;
+  const ta=document.querySelector(`#sent${S.act} textarea[data-f="phien_am"]`); if(!ta) return;
+  const k=+r.dataset.k; let i=0;
+  ta.value = ta.value.normalize('NFC').replace(SYL_RE, m => {
+    if (i++!==k) return m;
+    const rep=r.dataset.r; return m[0]!==m[0].toLowerCase() ? rep[0].toUpperCase()+rep.slice(1) : rep;
+  });
+  ta.dispatchEvent(new Event('input',{bubbles:true})); ta.focus();
+});
+
+// ================= MODE 2: chữ Hán =================
+// âm của câu: bản đang gõ dở trong ô phiên âm (nếu có) hoặc bản đã lưu
+const sylsOf = si => si in S.draftPa ? sylls(S.draftPa[si]) : S.doc.sents[si].syls;
+function sylOf(si, k){ return sylsOf(si)[k+(S.shift[si]||0)]||''; }
+function ocrHint(si, k){ const s=S.doc.sents[si], syl=sylOf(si,k); const h=s.ocr_hints.find(([c,y])=>sylKey(y)===sylKey(syl)); return h?h[0]:''; }
+function renderHan() {
+  $('#col1').innerHTML = '<p class="muted">Chọn một ô chữ ở cột giữa.</p>';
+  $('#col2').innerHTML = S.doc.sents.map((s,si)=>{
+    const chars=[...s.han], nu=hanUnits(s.han).length;
+    let k=0;
+    const cells = chars.map((ch,i)=>{
+      if (!(isHan(ch)||ch==='□')) return `<div class="cell p"><div class="c han">${esc(ch)}</div></div>`;
+      const kk=k++, syl=sylOf(si,kk);
+      const cls=['cell', ch==='□'?'miss':'', S.fixed.has(s.sent_id+':'+i)?'fixed':'', (S.sel&&S.sel.si===si&&S.sel.i===i)?'sel':''].join(' ');
+      return `<div class="${cls}" data-si="${si}" data-i="${i}" data-k="${kk}" title="${esc(syl)}"><div class="c han">${esc(ch)}</div><div class="s">${esc(syl)||'·'}</div></div>`;
+    }).join('');
+    return `<div class="sent ${s.review.han?'done':''} ${S.sel&&S.sel.si===si?'active':''}" id="sent${si}">
+      <div class="sid"><span>${s.sent_id} · <span id="cnt${si}">${cntHtml(si)}</span></span>${vbtn(s,si)}</div>
+      <div class="cells">${cells}</div>
+      <textarea data-f="phien_am" data-si="${si}" rows="2" title="Sửa phiên âm — Enter lưu, Esc hoàn tác" class="pa-edit${si in S.draftPa?" dirty":""}">${esc(S.draftPa[si] ?? s.phien_am)}</textarea>
+      ${s.ghi_chu?`<div class="note">${esc(s.ghi_chu)}</div>`:''}
+    </div>`;
+  }).join('');
+  markBadCells();
+}
+function cntHtml(si){
+  const s=S.doc.sents[si], nu=hanUnits(s.han).length, ny=sylsOf(si).length, sh=S.shift[si]||0;
+  return `<span class="${nu+sh!==ny?'warn':''}">${nu} chữ / ${ny} âm${sh?` · lệch ${sh>0?'+':''}${sh}`:''}</span>
+    <button class="vbtn" data-add="${si}" title="Chèn 1 ô □ sau ô đang chọn (chưa chọn ô nào trong câu thì thêm cuối câu)">+□</button>
+    ${ny>nu?`<button class="vbtn" data-fill="${si}" title="Thêm ${ny-nu} ô □ vào cuối câu cho bằng số âm">Bù ${ny-nu} □</button>`:''}`;
+}
+// chèn n ô □ vào câu si tại vị trí ký tự idx (mặc định: sau ô đang chọn, hoặc cuối câu)
+async function insertMissing(si, n, atEnd){
+  const sent=S.doc.sents[si], card=$('#sent'+si);
+  const ta=card && card.querySelector('textarea.dirty'); if(ta && !(await saveField(ta))) return;
+  const len=[...sent.han].length;
+  const idx = (!atEnd && S.sel && S.sel.si===si) ? S.sel.i+1 : len;
+  const r=await api('/api/insert',{sent_id:sent.sent_id, idx, n});
+  if(!r.ok) return toast('Lỗi: '+r.error);
+  Object.assign(sent, r.sent);
+  // dời chỉ số các ô đã sửa (tô xanh) nằm sau chỗ chèn
+  S.fixed = new Set([...S.fixed].map(key=>{ const [sid,i]=key.split(':'); return sid===sent.sent_id && +i>=idx ? `${sid}:${+i+n}` : key; }));
+  toast(`${sent.sent_id}: thêm ${n} ô □`);
+  renderHan(); syncDocStats();
+  select(si, idx, hanUnits([...sent.han].slice(0,idx).join('')).length); // chọn ô □ đầu tiên vừa chèn
+}
+$('#col2').addEventListener('click', e=>{
+  const a=e.target.closest('[data-add],[data-fill]'); if(!a || S.mode!=='han') return;
+  e.stopPropagation();
+  if (a.dataset.add!==undefined) insertMissing(+a.dataset.add, 1, false);
+  else { const si=+a.dataset.fill, n=sylsOf(si).length-hanUnits(S.doc.sents[si].han).length; if(n>0) insertMissing(si, n, true); }
+}, true);
+// cập nhật âm dưới các ô chữ của một câu tại chỗ (không dựng lại thẻ để không mất focus / click đang dở)
+function updateCellSyls(si){
+  const cells=document.querySelectorAll(`#col2 .cell[data-si="${si}"]`);
+  cells.forEach(el=>{ const syl=sylOf(si,+el.dataset.k); el.querySelector('.s').textContent=syl||'·'; el.title=syl; el.classList.remove('bad'); });
+  const c=$('#cnt'+si); if(c) c.innerHTML=cntHtml(si);
+  markBadCells(cells);
+}
+async function markBadCells(cells){
+  for (const el of cells || document.querySelectorAll('#col2 .cell[data-si]')) {
+    const ch=[...S.doc.sents[+el.dataset.si].han][+el.dataset.i]; if (ch==='□') continue;
+    const syl=sylOf(+el.dataset.si, +el.dataset.k); if (!syl) continue;
+    const info=await charInfo(ch);
+    if (syl!==sylOf(+el.dataset.si, +el.dataset.k)) continue; // âm đã đổi trong lúc chờ
+    if (!info.syls.some(y=>sylKey(y)===sylKey(syl))) { el.classList.add('bad'); el.title=`${syl} — từ điển: ${info.syls.join(', ')||'(không có)'}`; }
+  }
+}
+$('#col2').addEventListener('click', e=>{
+  if (S.mode!=='han') { const c=e.target.closest('.sent'); if(c && +c.dataset.si!==S.act) activate(+c.dataset.si); return; }
+  const el=e.target.closest('.cell[data-si]'); if(el) select(+el.dataset.si, +el.dataset.i, +el.dataset.k);
+});
+function select(si,i,k){
+  S.sel={si,i,k}; S.act=si;
+  document.querySelectorAll('#col2 .sel').forEach(x=>x.classList.remove('sel'));
+  document.querySelectorAll('#col2 .sent.active').forEach(x=>x.classList.remove('active'));
+  const el=document.querySelector(`#col2 .cell[data-si="${si}"][data-i="${i}"]`);
+  if (el){ el.classList.add('sel'); el.closest('.sent').classList.add('active'); el.scrollIntoView({block:'nearest'}); }
+  loadCands(sylOf(si,k)); highlightBox();
+}
+function moveSel(d){
+  if(!S.sel) return gotoNextMiss();
+  const all=[...document.querySelectorAll('#col2 .cell[data-si]')];
+  const j=all.findIndex(x=>+x.dataset.si===S.sel.si&&+x.dataset.i===S.sel.i);
+  const el=all[j+d]; if(el) select(+el.dataset.si,+el.dataset.i,+el.dataset.k);
+}
+function gotoNextMiss(fromStart=false){
+  const cells=[...document.querySelectorAll('#col2 .cell[data-si]')];
+  const cur = (!fromStart && S.sel) ? cells.findIndex(x=>+x.dataset.si===S.sel.si&&+x.dataset.i===S.sel.i) : -1;
+  const el=cells.slice(cur+1).find(x=>x.classList.contains('miss'));
+  if (el) return select(+el.dataset.si,+el.dataset.i,+el.dataset.k);
+  if (fromStart) return;
+  const docs=S.info.docs, i=docs.findIndex(d=>d.doc_id===S.doc.doc_id);
+  const nx=docs.slice(i+1).find(d=>d.missing>0);
+  if(nx) loadDoc(nx.doc_id); else toast('Hết ô □');
+}
+let candReq=0;
+async function loadCands(syl){
+  const s=S.sel; if(!s) return;
+  const cur=[...S.doc.sents[s.si].han][s.i];
+  const ocr = cur==='□' ? ocrHint(s.si,s.k) : cur;
+  const id=++candReq;
+  const [r, info] = await Promise.all([api(`/api/candidates?syl=${encodeURIComponent(syl)}&ocr=${encodeURIComponent(ocr)}`), cur!=='□'?charInfo(cur):null]);
+  const simOnly = ocr ? (await charInfo(ocr)).similar.slice(0,20) : [];
+  if(id!==candReq || S.mode!=='han') return;
+  S.cands=r.items;
+  $('#col1').innerHTML = `
+    <div class="sylbar"><button id="shL" title="Âm lệch trái [">[</button><input id="sylIn" value="${esc(syl)}" placeholder="gõ âm, Enter"><button id="shR" title="Âm lệch phải ]">]</button></div>
+    <div class="cur"><div class="big han">${esc(cur)}</div><div>
+      <div><b>${esc(S.doc.sents[s.si].sent_id)}</b> · chữ ${s.k+1}</div>
+      ${info?`<div class="muted">từ điển: ${esc(info.syls.join(', ')||'(không có)')}</div>`:''}
+      ${ocr&&cur==='□'?`<div class="muted">OCR gốc: <span class="han" style="font-size:18px">${esc(ocr)}</span></div>`:''}
+      <div style="margin-top:4px"><button id="setMiss">Đặt □</button></div></div></div>
+    <div class="sub">${r.items.length} chữ đọc là “${esc(syl)}” · <span style="color:var(--warn)">≈</span> giống chữ OCR · số = tần suất trong sách</div>
+    <div class="grid">${r.items.map((c,n)=>`<div class="cand ${c.similar?'sim':''}" data-ch="${esc(c.ch)}" title="${esc(c.syls.join(', '))}">${n<9?`<span class="k">${n+1}</span>`:''}<div class="c han">${esc(c.ch)}</div><div class="f">${c.freq||''}</div></div>`).join('') || '<p class="muted">Không có chữ nào.</p>'}</div>
+    ${simOnly.length?`<div class="sub">Chữ có hình giống “${esc(ocr)}” (mọi âm)</div><div class="grid">${simOnly.map(c=>`<div class="cand" data-ch="${esc(c)}"><div class="c han">${esc(c)}</div></div>`).join('')}</div>`:''}`;
+  $('#sylIn').addEventListener('keydown', e=>{ if(e.key==='Enter') loadCands(e.target.value.trim()); e.stopPropagation(); });
+  $('#shL').onclick=()=>shift(-1); $('#shR').onclick=()=>shift(1);
+  $('#setMiss').onclick=()=>pick('□');
+}
+$('#col1').addEventListener('click', e=>{ const c=e.target.closest('.cand'); if(c && S.mode==='han') pick(c.dataset.ch); });
+function shift(d){ if(!S.sel) return; const {si,i,k}=S.sel; S.shift[si]=(S.shift[si]||0)+d; renderHan(); select(si,i,k); }
+async function pick(ch){
+  const s=S.sel; if(!s) return;
+  const sent=S.doc.sents[s.si], before=[...sent.han][s.i];
+  if (before===ch) return;
+  const r=await api('/api/set',{sent_id:sent.sent_id, idx:s.i, ch});
+  if(!r.ok) return toast('Lỗi: '+r.error);
+  Object.assign(sent, r.sent); S.fixed.add(sent.sent_id+':'+s.i);
+  toast(`${sent.sent_id}: ${before} → ${ch}`);
+  renderHan(); syncDocStats();
+  if (before==='□' && ch!=='□') gotoNextMiss(); else select(s.si,s.i,s.k);
+}
+
+// ---------- col 3: ảnh ----------
+function loadImage(){
+  const img=$('#img');
+  img.onload=()=>{ const ov=$('#ov'); ov.setAttribute('width',img.naturalWidth); ov.setAttribute('height',img.naturalHeight); ov.setAttribute('viewBox',`0 0 ${img.naturalWidth} ${img.naturalHeight}`); fit(); drawBoxes(); };
+  img.src='/img/'+(S.img==='han'?S.doc.han_image:S.doc.viet_image);
+  $('#imgHan').style.borderColor = S.img==='han'?'var(--accent)':''; $('#imgViet').style.borderColor = S.img==='viet'?'var(--accent)':'';
+}
+const boxes = () => (S.doc && S.doc.boxes[S.img]) || [];
+// nới khung OCR ra ngoài để viền không đè lên dấu thanh / nét chữ
+function padPoly(pts){
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const cx=xs.reduce((a,b)=>a+b)/xs.length, cy=ys.reduce((a,b)=>a+b)/ys.length;
+  const thin=Math.min(Math.max(...xs)-Math.min(...xs), Math.max(...ys)-Math.min(...ys));
+  const pad=thin*0.35+8;
+  return pts.map(([x,y])=>[Math.round(x+Math.sign(x-cx)*pad), Math.round(y+Math.sign(y-cy)*pad)]);
+}
+function drawBoxes(){
+  $('#ov').innerHTML=boxes().map((b,n)=>`<polygon points="${padPoly(b.points).map(p=>p.join(',')).join(' ')}"><title>${esc(b.transcription)}</title></polygon>`).join('');
+  highlightBox();
+}
+// Tìm vị trí chữ đang chọn trên ảnh Hán THEO THỨ TỰ, không theo nội dung chữ:
+// chữ thứ N của văn bản (đếm nối tiếp qua các câu) -> chữ Hán thứ N trên ảnh, đếm lần lượt qua các khung OCR
+// theo thứ tự đọc trong Label.txt. Chữ trong ảnh có bị OCR sai/khác TSV thì ô đỏ vẫn đứng đúng vị trí.
+function locateChar(){
+  const sents=S.doc.sents;
+  let g=S.sel.k;
+  for(let i=0;i<S.sel.si;i++) g+=hanUnits(sents[i].han).length;
+  let best=null, seen=0;
+  boxes().some((b,n)=>{
+    const T=[...b.transcription];
+    const hp=[]; T.forEach((c,p)=>{ if(isHan(c)||c==='□') hp.push(p); }); // vị trí các chữ Hán trong dòng
+    if(g < seen+hp.length){ best={n, q:hp[g-seen], L:T.length}; return true; }
+    seen+=hp.length; return false;
+  });
+  if(!best) return null; // vị trí vượt quá số chữ đọc được trên ảnh
+  // Khung OCR là tứ giác (có thể nghiêng): lấy 2 cạnh ngắn làm hai đầu dòng, nội suy dọc theo 2 cạnh dài.
+  const P=boxes()[best.n].points, d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  let A,B; // A = đầu dòng, B = cuối dòng; A[i] nối với B[i] bằng cạnh dài
+  if (d(P[0],P[1]) < d(P[1],P[2])) { A=[P[0],P[1]]; B=[P[3],P[2]]; } else { A=[P[1],P[2]]; B=[P[0],P[3]]; }
+  const mid=e=>[(e[0][0]+e[1][0])/2,(e[0][1]+e[1][1])/2], ma=mid(A), mb=mid(B);
+  const vertical = Math.abs(mb[1]-ma[1]) >= Math.abs(mb[0]-ma[0]);
+  if (vertical ? ma[1]>mb[1] : ma[0]>mb[0]) [A,B]=[B,A]; // cột: trên -> dưới; dòng ngang: trái -> phải
+  const lerp=(p,q,t)=>[p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t];
+  const t0=best.q/best.L, t1=(best.q+1)/best.L;
+  const quad=[lerp(A[0],B[0],t0), lerp(A[1],B[1],t0), lerp(A[1],B[1],t1), lerp(A[0],B[0],t1)];
+  const cx=quad.reduce((s,p)=>s+p[0],0)/4, cy=quad.reduce((s,p)=>s+p[1],0)/4;
+  // khung OCR đã được nới sẵn (unclip): thu ngang còn 80%, nới dọc theo dòng 15% cho khỏi đè nét
+  const L=Math.hypot(mb[0]-ma[0], mb[1]-ma[1])||1, ux=(mb[0]-ma[0])/L, uy=(mb[1]-ma[1])/L;
+  return quad.map(([x,y])=>{ const dx=x-cx, dy=y-cy, a=dx*ux+dy*uy, p=-dx*uy+dy*ux, A=a*1.15, Pp=p*0.8;
+    return [Math.round(cx+A*ux-Pp*uy), Math.round(cy+A*uy+Pp*ux)]; });
+}
+function highlightBox(){
+  document.querySelectorAll('#ov .charhit').forEach(r=>r.remove());
+  // Chỉ khoanh ở chế độ chữ Hán, và khoanh đúng một chữ. Ảnh Việt (sửa phiên âm / dịch nghĩa) không khoanh.
+  if(!S.doc || S.img!=='han' || S.mode!=='han' || !S.sel) return;
+  const q=locateChar(); if(!q) return;
+  $('#ov').insertAdjacentHTML('beforeend', `<polygon class="charhit" points="${q.map(p=>p.join(',')).join(' ')}"></polygon>`);
+  centerOn(q);
+}
+function apply(){ $('#stage').style.transform=`translate(${S.z.x}px,${S.z.y}px) scale(${S.z.s})`; }
+function fitScale(){ const v=$('#view'), img=$('#img'); return Math.min(v.clientWidth/img.naturalWidth, v.clientHeight/img.naturalHeight); }
+function fit(){ const v=$('#view'), img=$('#img'); if(!img.naturalWidth) return; const s=fitScale(); S.z={s, x:(v.clientWidth-img.naturalWidth*s)/2, y:(v.clientHeight-img.naturalHeight*s)/2}; apply(); }
+function zoomAt(f,cx,cy){ const z=S.z, ns=Math.min(8,Math.max(.05,z.s*f)); z.x=cx-(cx-z.x)*ns/z.s; z.y=cy-(cy-z.y)*ns/z.s; z.s=ns; apply(); }
+function centerOn(pts){
+  const v=$('#view'), img=$('#img'); if(!img.naturalWidth) return;
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+  const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
+  if (S.z.s<=fitScale()*1.01) S.z.s=Math.max(fitScale(), Math.min(v.clientWidth*0.95/w, v.clientHeight*0.95/h, fitScale()*3)); // tự phóng khi đang ở chế độ vừa khung
+  S.z.x=v.clientWidth/2-cx*S.z.s; S.z.y=v.clientHeight/2-cy*S.z.s; apply();
+}
+const view=$('#view');
+view.addEventListener('wheel',e=>{ e.preventDefault(); const r=view.getBoundingClientRect(); zoomAt(e.deltaY<0?1.15:1/1.15, e.clientX-r.left, e.clientY-r.top); },{passive:false});
+view.addEventListener('pointerdown',e=>{ const sx=e.clientX-S.z.x, sy=e.clientY-S.z.y; view.classList.add('drag'); view.setPointerCapture(e.pointerId);
+  const mv=ev=>{ S.z.x=ev.clientX-sx; S.z.y=ev.clientY-sy; apply(); };
+  const up=()=>{ view.classList.remove('drag'); view.removeEventListener('pointermove',mv); view.removeEventListener('pointerup',up); };
+  view.addEventListener('pointermove',mv); view.addEventListener('pointerup',up); });
+$('#zIn').onclick=()=>zoomAt(1.3,view.clientWidth/2,view.clientHeight/2);
+$('#zOut').onclick=()=>zoomAt(1/1.3,view.clientWidth/2,view.clientHeight/2);
+$('#zFit').onclick=fit;
+$('#imgHan').onclick=()=>{S.img='han';loadImage();};
+$('#imgViet').onclick=()=>{S.img='viet';loadImage();};
+window.addEventListener('resize',fit);
+
+// ---------- header / phím ----------
+$('#docSel').onchange=e=>loadDoc(e.target.value);
+$('#prevDoc').onclick=()=>stepDoc(-1); $('#nextDoc').onclick=()=>stepDoc(1);
+$('#onlyTodo').onchange=renderDocSel;
+$('#nextMiss').onclick=()=>gotoNextMiss();
+window.addEventListener('beforeunload', e=>{ if(document.querySelector('#col2 textarea.dirty')) e.preventDefault(); });
+document.addEventListener('keydown',async e=>{
+  if (S.mode==='pa_dn') {
+    const t=e.target.closest?.('textarea');
+    if (e.ctrlKey && e.key==='Enter') { // lưu + duyệt + sang câu chưa duyệt kế tiếp
+      e.preventDefault(); const si=S.act;
+      if(!(await saveCard(si))) return;
+      if(!S.doc.sents[si].review.pa_dn) await toggleReview(si);
+      const nx=S.doc.sents.findIndex((s,j)=>j>si && !s.review.pa_dn);
+      if (nx>=0) activate(nx);
+      else { const docs=S.info.docs, i=docs.findIndex(d=>d.doc_id===S.doc.doc_id); const nd=docs.slice(i+1).find(d=>d.done.pa_dn<d.sents); if(nd) loadDoc(nd.doc_id); else toast('Đã duyệt hết'); }
+    } else if (e.altKey && (e.key==='ArrowDown'||e.key==='ArrowUp')) { e.preventDefault(); activate(S.act+(e.key==='ArrowDown'?1:-1)); }
+    else if (e.key==='Escape' && t) { const s=S.doc.sents[+t.dataset.si]; t.value=s[t.dataset.f]; t.dispatchEvent(new Event('input',{bubbles:true})); }
+    return;
+  }
+  const ta=e.target.closest?.('textarea[data-f="phien_am"]');
+  if (ta) { // ô phiên âm ở chế độ chữ Hán: Enter lưu (rời ô -> focusout lưu), Esc hoàn tác
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); }
+    else if (e.key==='Escape') { const s=S.doc.sents[+ta.dataset.si]; ta.value=s.phien_am; ta.dispatchEvent(new Event('input',{bubbles:true})); ta.blur(); }
+    return;
+  }
+  if (e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA'||e.ctrlKey||e.metaKey||e.altKey) return;
+  if (e.key==='ArrowRight'){ moveSel(1); e.preventDefault(); }
+  else if (e.key==='ArrowLeft'){ moveSel(-1); e.preventDefault(); }
+  else if (e.key==='n'||e.key==='N') gotoNextMiss();
+  else if (e.key==='v'||e.key==='V') { if(S.sel) toggleReview(S.sel.si); }
+  else if (e.key==='['){ shift(-1); } else if (e.key===']'){ shift(1); }
+  else if (e.key === 'Delete') {
+    pick(''); // Xóa hẳn chữ
+    e.preventDefault();
+}
+else if (e.key === 'Backspace') {
+    pick('□'); // Đưa về ô thiếu
+    e.preventDefault();
+}
+  else if (/^[1-9]$/.test(e.key)){ const c=S.cands[+e.key-1]; if(c) pick(c.ch); }
+  else if (e.key==='/'){ const i=$('#sylIn'); if(i){ i.focus(); i.select(); e.preventDefault(); } }
+});
+
+(async()=>{
+  S.info=await api('/api/info');
+  $('#book').textContent=S.info.book;
+  let last=null; try{ last=localStorage.getItem('fixui.doc'); }catch(e){}
+  const first = S.info.docs.find(d=>d.doc_id===last) || S.info.docs.find(docTodo) || S.info.docs[0];
+  setMode(S.mode);
+  loadDoc(first.doc_id);
+})();
+</script>
+</body>
+</html>

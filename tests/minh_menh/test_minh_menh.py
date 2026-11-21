@@ -198,6 +198,18 @@ class TestAlign(unittest.TestCase):
         self.assertEqual([st.text[a:b] for a, b in zip(cuts, cuts[1:])], ["明命元年", "帝御乾元殿觀之", "命兵部改正兵籍"])
         self.assertEqual(len(margins), len(cuts))
 
+    def test_global_cut_matches_sentence_edges(self):
+        # Theo độ dài thì cắt sớm (câu 1 ngắn); khớp mép "… tâu lên" ↔ 以聞, "Vua ưng cho" ↔ 上許 kéo về đúng chỗ
+        text = "臣奏請增設防兵以聞上許之命廷議"
+        st = build_stream([HanUnit(text, 0, 0, (1, 1), [text])])
+        sents = [VietSentence("Quan xin thêm lính, tâu lên.", "D.001", 0, 0),
+                 VietSentence("Vua ưng cho, lại sai đình thần họp bàn định số lính phòng giữ mỗi đồn.", "D.001", 0, 0)]
+        rough = [0, 6, len(text)]
+        cuts, _ = align_stream(st, sents, rough, READ, ratio=1.5, P={"w_edge": 0.0})
+        self.assertEqual(text[:cuts[1]], "臣奏請增")
+        cuts, _ = align_stream(st, sents, rough, READ, ratio=1.5)
+        self.assertEqual(text[:cuts[1]], "臣奏請增設防兵以聞")
+
     def test_group_merges_uncertain_and_empty(self):
         cuts = [0, 5, 9, 9, 20]
         # biên độ thấp ở cắt 2 -> gộp câu 1–2; câu 2 có đoạn Hán rỗng (cuts[2] == cuts[3]) -> gộp với câu sau

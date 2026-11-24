@@ -53,7 +53,7 @@ def han_bigrams(text: str, readings: Readings) -> set[str]:
         for x in k1:
             for y in k2:
                 out.add(f"{x} {y}")
-                out.add(f"{y} {x}")  # tiếng Việt đảo trật tự: 兵部 -> Bộ Binh
+                out.add(f"{y} {x}")
     return out
 
 
@@ -87,7 +87,6 @@ def _align_quyen(units: list[HanUnit], sents: list[VietSentence], readings: Read
     ph = np.concatenate([[0], np.cumsum(lh)])
     pv = np.concatenate([[0], np.cumsum(lv)])
 
-    # Ma trận số cặp âm chung, chỉ tính trong dải mặt tờ gần nhau; bỏ cặp âm quá phổ biến.
     hb = [han_bigrams(u.text, readings) for u in units]
     vb = [viet_bigrams(s.text) for s in sents]
     df = Counter(b for s in vb for b in s)
@@ -100,13 +99,11 @@ def _align_quyen(units: list[HanUnit], sents: list[VietSentence], readings: Read
                 lex[i + 1, j + 1] = min(len(hb[i] & vb[j]), 10)
     lex = lex.cumsum(0).cumsum(1)
 
-    # Dòng niên hiệu (明命三年 ↔ "NĂM MINH-MỆNH THỨ BA (1822)") là neo mạnh: nên đứng riêng, 1:1, cùng năm.
     hy = [u.year for u in units]
     vy = [s.year for s in sents]
     chy = np.concatenate([[0], np.cumsum([y is not None for y in hy])])
     cvy = np.concatenate([[0], np.cumsum([y is not None for y in vy])])
 
-    # Dải j hợp lệ cho mỗi ranh giới i: câu dịch cách mặt tờ của đoạn Hán i không quá FOLIO_BAND.
     hf = [u.folio_start for u in units] + [units[-1].folio_end]
     vf = [s.folio_start for s in sents] + [sents[-1].folio_end]
 
@@ -155,7 +152,7 @@ def _align_quyen(units: list[HanUnit], sents: list[VietSentence], readings: Read
                             else:
                                 c += 6.0 * (nhy + nvy)
                         if sents[j].doc_id != sents[j2 - 1].doc_id:
-                            c += 1.5  # gộp câu của hai văn bản
+                            c += 1.5
                     tot = base + c
                     if tot < best[i2].get(j2, (INF,))[0]:
                         best[i2][j2] = (tot, a, b)
@@ -194,7 +191,7 @@ def low_confidence(n_han: int, n_syl: int, quyen_ratio: float, n_units: int, n_s
     if rel > 1.45 or rel < 0.65:
         out.append("TIN_CAY_THAP:TY_LE")
     if n_sents >= MAX_B and lex == 0:
-        out.append("TIN_CAY_THAP:GOP_TOI_DA")  # cặp gốc bị ép gộp đủ MAX_B câu và phần này không có âm chung
+        out.append("TIN_CAY_THAP:GOP_TOI_DA")
     if gap:
         out.append("TIN_CAY_THAP:LECH_TO")
     if n_han < 12 and lex == 0:
@@ -202,11 +199,10 @@ def low_confidence(n_han: int, n_syl: int, quyen_ratio: float, n_units: int, n_s
     if "NOI_CAU_KHONG_CO_HAN" in warns:
         out.append("TIN_CAY_THAP:NOI_CAU")
     if cut_score <= 0 and lex == 0:
-        out.append("TIN_CAY_THAP:CAT_TUY_Y")  # cắt giữa chuỗi chữ, không có ranh giới tự nhiên hay âm chung
+        out.append("TIN_CAY_THAP:CAT_TUY_Y")
     return out
 
 
-# ---------------------------------------------------------------- tách tới đơn vị nhỏ nhất: 1 câu dịch
 
 _FINAL = set("也矣乎焉哉耳")
 _STARTS = ("帝曰", "帝諭", "諭曰", "帝從", "帝命", "帝謂", "帝以", "帝聞", "帝準", "帝可", "帝批", "帝善",
@@ -226,7 +222,7 @@ def _cut_bonus(text: str, p: int, col: set[int], para: set[int]) -> float:
         b += 1.0
     if any(text.endswith(s, 0, p) for s in _AFTER):
         b += 1.0
-    if text.endswith("曰", 0, p):  # không cắt ngay sau 曰 (lời nói thuộc cùng câu)
+    if text.endswith("曰", 0, p):
         b -= 2.0
     return b
 
@@ -235,7 +231,7 @@ def _cut_bonus(text: str, p: int, col: set[int], para: set[int]) -> float:
 class Piece:
     han: str
     sents: list[VietSentence]
-    cut_score: float  # điểm ranh giới thấp nhất của hai đầu đoạn (thấp = cắt tùy ý, kém tin cậy)
+    cut_score: float
     lex: int
 
 
@@ -260,7 +256,6 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
     n = len(text)
     bonus = [0.0] + [_cut_bonus(text, p, col, para) for p in range(1, n)] + [9.0]
     has_cols = bool(col - {n})
-    # vị trí p khớp câu j nếu cặp chữ text[p:p+2] có âm trùng một cặp âm tiết của câu j
     keys = [sorted(readings.han2keys.get(c, ()))[:8] for c in text]
     vbs = [viet_bigrams(s.text) for s in sents]
     pref = []
@@ -282,7 +277,6 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
     tot_v = sum(lv)
     var = 1.5 * ratio
     INF = float("inf")
-    # best[j][p]: chi phí tốt nhất khi j câu đầu đã nhận text[:p]
     best = [dict() for _ in range(k + 1)]
     best[0][0] = (0.0, -1)
     cum_v = 0
@@ -303,7 +297,7 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
                 lex_hits = pref[j][p] - pref[j][p0]
                 cut = bonus[p] if p < n else 0.0
                 if doc_change and p < n and p not in col and has_cols:
-                    cut -= 4.0  # ranh giới văn bản nên rơi vào đầu cột
+                    cut -= 4.0
                 c = c0 + d * d / 2 - 0.7 * lex_hits - cut
                 if c < best[j + 1].get(p, (INF,))[0]:
                     best[j + 1][p] = (c, p0)
@@ -315,7 +309,7 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
     for j in range(k, 0, -1):
         p = best[j][p][1]
         cuts.append(p)
-    cuts.reverse()  # [0, c1, ..., n]
+    cuts.reverse()
     out = []
     for j in range(k):
         a, b = cuts[j], cuts[j + 1]
@@ -324,34 +318,18 @@ def split_to_sentences(units: list[HanUnit], sents: list[VietSentence], readings
     return out
 
 
-# ------------------------------------------------- dóng toàn cục cấp chữ + gộp ranh giới không chắc chắn
-# Đoạn OCR Hán (HanUnit) hay bị ngắt giữa câu (sang trang/cột, chú thích song hành), nên dóng theo đoạn rồi
-# mới cắt (split_to_sentences) để lại lỗi ở ranh giới đoạn (đo trên mẫu gán nhãn tay R1204: ~45% cặp lệch).
-# Ở đây coi cả quyển là một chuỗi chữ liên tục và chia thành đúng một đoạn cho mỗi câu dịch, trong dải ±W chữ
-# quanh vị trí thô lấy từ align_quyen. Điểm của đoạn (chữ a..b ↔ câu j):
-#   + âm Hán-Việt từng chữ có trong câu j (trọng số idf: âm xuất hiện ở ít câu thì đáng tin hơn)
-#   + cặp chữ liền nhau khớp cặp âm tiết của câu j (tên riêng, chức quan: 兵部 ↔ Bộ Binh)
-#   + dòng niên hiệu chỉ ghép với câu niên hiệu cùng năm
-#   − lệch độ dài (Gale–Church) ; + ranh giới tự nhiên (đầu đoạn/cột, 也 矣, 帝曰…: _cut_bonus)
-#   + khớp mép: 3 chữ sau điểm cắt ↔ âm tiết đầu câu sau, 3 chữ trước ↔ âm tiết cuối câu trước (âm Hán-Việt
-#     hoặc từ dịch quen thuộc EDGE_EQ: "Vua dụ rằng" ↔ 帝諭…曰, "… tâu lên" ↔ …以聞)
-# Mỗi điểm cắt có "biên độ" = chi phí tăng thêm khi dời nó > 2 chữ (giữ hai cắt bên cạnh). Biên độ thấp = mơ hồ:
-# gộp hai câu kề vào một cặp (gộp vẫn đúng nghĩa, cắt sai thì cả hai cặp sai).
 
-# w_cut, w_edge chọn trên nhãn ranh giới docs/danh_gia_minh_menh (354 điểm cắt): cắt đúng ±2 chữ 82.5% -> 88.7%.
 GLOBAL = dict(w_uni=0.6, w_bi=1.2, w_len=0.7, w_cut=1.2, W=150, empty=5.0, year=3.0, fold=0.7,
               w_edge=1.0)
 
-# Từ dịch quen thuộc ở đầu/cuối câu không trùng âm Hán-Việt với chữ Hán tương ứng (khóa đã bỏ dấu, _fold):
-# "Vua dụ rằng" ↔ 帝諭…曰, "Trẫm" ↔ 朕, "… tâu lên" ↔ …以聞, "Vua ưng cho" ↔ 許之/從之.
 EDGE_EQ = {
     "vua": "帝上", "tram": "朕", "tau": "奏言聞", "du": "諭", "bao": "謂諭", "phan": "曰諭", "rang": "曰",
     "khien": "命令", "sai": "命令遣", "xin": "請乞", "cho": "許準允從可", "ung": "許準允", "chuan": "準許",
     "theo": "從", "khen": "嘉奬賞", "thuong": "賞", "moi": "初", "truoc": "先初", "lai": "又復", "quan": "臣",
     "ban": "賜諭頒", "nay": "今玆", "neu": "如若儻", "phai": "是宜", "vay": "也矣", "duoc": "得",
 }
-EDGE_N = 5          # số âm tiết đầu/cuối câu dịch đem so
-EDGE_POS = (1.0, 0.6, 0.3)  # trọng số chữ Hán thứ 1, 2, 3 tính từ điểm cắt
+EDGE_N = 5
+EDGE_POS = (1.0, 0.6, 0.3)
 
 
 def _fold(key: str) -> str:
@@ -445,7 +423,6 @@ def align_stream(st: Stream, sents: list[VietSentence], rough: list[int], readin
     var = 1.5 * ratio
     INF = 1e18
 
-    # Khớp mép: chữ Hán ngay sau điểm cắt ↔ âm tiết đầu câu sau, chữ ngay trước ↔ âm tiết cuối câu trước.
     def edge_sets(keys: list[str]) -> tuple[set, set, set]:
         f = {_fold(x) for x in keys}
         return set(keys), f, {c for x in f for c in EDGE_EQ.get(x, "")}
@@ -559,7 +536,7 @@ def group_sentences(cuts: list[int], margins: list[float], tau: float) -> list[t
         if j == m or (margins[j] >= tau and cuts[j] > cuts[start]):
             if j < m or cuts[j] > cuts[start] or not groups:
                 groups.append((start, j))
-            else:  # đoạn cuối rỗng: nối vào nhóm trước
+            else:
                 groups[-1] = (groups[-1][0], j)
             start = j
     return groups

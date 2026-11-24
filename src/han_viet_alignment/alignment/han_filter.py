@@ -53,7 +53,6 @@ def filter_han_lines(lines: list[str], scores: list[float | None], phien_am: str
     for li, line in enumerate(lines):
         sc = scores[li] if li < len(scores) else None
         info = LineInfo(line, sc, n_han[li], n_match[li], True)
-        # Không có điểm (dữ liệu OCR cũ) hoặc không có phiên âm để đối chiếu -> không lọc
         if sc is not None and syls and sc < min_score and info.match_ratio < min_match:
             info.kept = False
         out.append(info)

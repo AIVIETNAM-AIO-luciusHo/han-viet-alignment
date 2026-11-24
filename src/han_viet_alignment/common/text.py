@@ -9,8 +9,8 @@ import re
 import unicodedata
 from pathlib import Path
 
-MISSING = "□"  # U+25A1 — chữ không đọc được / khuyết
-DN_MISSING = "[...]"  # đoạn bản dịch bị khuyết
+MISSING = "□"
+DN_MISSING = "[...]"
 HAN_PUNCT = set("，。、；：！？「」『』（）《》〈〉・")
 PUNCT = re.compile(r"[^\w\s□]", re.UNICODE)
 _TONES = {"̀": "2", "́": "1", "̃": "4", "̉": "3", "̣": "5"}

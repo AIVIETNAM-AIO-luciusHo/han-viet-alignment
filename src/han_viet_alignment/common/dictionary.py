@@ -16,7 +16,6 @@ class Readings:
     def __init__(self, han2keys: dict[str, set[str]], surface: dict[str, str] | None = None):
         self.han2keys = han2keys
         self.valid_keys = {k for ks in han2keys.values() for k in ks}
-        # khóa -> cách viết âm (chữ thường) để sửa phiên âm theo chữ Hán
         self.surface = surface if surface is not None else {}
 
     def __len__(self) -> int:

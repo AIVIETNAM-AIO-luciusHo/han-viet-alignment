@@ -44,9 +44,6 @@ from han_viet_alignment.minh_menh.viet_text import (  # noqa: E402
 
 REVIEW_COLUMNS = ["sent_id", "co", "so_chu_han", "so_am_tiet", "ty_le", "bien_do",
                   "to_han", "to_dich", "so_cau_dich", "canh_bao"]
-# Biên độ tối thiểu để giữ một điểm cắt giữa hai câu dịch (thấp hơn -> gộp hai câu vào một cặp). Chọn trên mẫu
-# gán nhãn ranh giới đúng (do mô hình Claude gán, chưa người duyệt) 141 khối / 404 ranh giới (R1204 61, R1205 40, R1206 40 khối) sao cho tỷ lệ cặp lệch ranh giới
-# ước lượng ≈ 20% (chừa biên dưới ngưỡng 30% của HD mục 8 vì mẫu nhỏ). Xem docs/bao_cao.md mục Minh Mệnh.
 NGUONG_GOP = {"R1204": 1.25, "R1205": 1.25, "R1206": 1.75}
 NGUONG_GOP_MAC_DINH = 1.5
 
@@ -79,7 +76,6 @@ def main() -> None:
     viet_md = (bdir / "02_ocr_tho" / "viet" / f"{book}_dich_nghia_sach.md").read_text(encoding="utf-8")
     dn_path = bdir / "03_text_sach" / "dich_nghia.txt"
     if not dn_path.exists():
-        # Nhóm chưa chia văn bản: chia tự động từ lớp chữ PDF (xem segment_translation), phien_am.txt chỉ có tiêu đề
         docs = segment_translation(viet_md)
         if not docs:
             sys.exit(f"[!] Thiếu {dn_path} và không chia được bản dịch từ {book}_dich_nghia_sach.md.")
@@ -109,8 +105,6 @@ def main() -> None:
     types = doc_types(book)
     dropped = [(p, ln, r) for p, ln, r in hb.dropped]
 
-    # 1) dóng thô theo đoạn (align_quyen) -> vị trí thô; 2) dóng toàn cục cấp chữ trên cả quyển;
-    # 3) gộp câu qua điểm cắt có biên độ < --nguong-gop (xem align.py: GLOBAL, group_sentences).
     pairs: list[dict] = []
     for q, units, qsents in split_by_quyen(hb.units, sents):
         if not qsents:
@@ -122,7 +116,6 @@ def main() -> None:
         st = build_stream(units)
         beads = align_quyen(units, qsents, readings, ratio)
         cuts, margins = align_stream(st, qsents, rough_cuts(units, qsents, beads, st), readings, ratio)
-        # chữ -> đoạn OCR (để ghi mặt tờ)
         unit_of = np.searchsorted(np.array(st.unit_start), np.arange(len(st.text) + 1), side="right") - 1
         for a, b in group_sentences(cuts, margins, args.nguong_gop):
             h0, h1 = cuts[a], cuts[b]
@@ -134,7 +127,6 @@ def main() -> None:
                           "fol": (u0.folio_start, u1.folio_end), "edge": min(margins[a], margins[b]),
                           "n_han": h1 - h0, "n_syl": sum(len(syllables(x.text)) for x in vs)})
 
-    # Tỷ lệ âm tiết/chữ Hán theo từng quyển (người dịch mỗi quyển viết dài ngắn khác nhau).
     by_q: dict[int, list[float]] = {}
     for p in pairs:
         if p["n_han"] >= 20:
@@ -178,7 +170,7 @@ def main() -> None:
         return row, rev
 
     rows, review, counter = [], [], {}
-    for p in kept:  # sent_id đánh lại liên tục trong từng văn bản sau khi lọc
+    for p in kept:
         doc = p["doc_id"]
         counter[doc] = counter.get(doc, 0) + 1
         row, rev = to_row(p, f"{doc}.{counter[doc]}")

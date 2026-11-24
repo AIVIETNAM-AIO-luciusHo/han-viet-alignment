@@ -14,13 +14,14 @@ from .clause import refine_pair
 from .han_pa import _align
 
 _SENT = re.compile(r"(?<=\.)\s+(?=[A-ZÀ-ỸĐ0-9])")
-_N_INS = re.compile(r"^(\d+) chữ Hán OCR chưa nhận được, ghi □; cần đối chiếu ảnh gốc để nhập lại\.$")
-_N_PRE = re.compile(r"^(\d+) chữ Hán không đọc được \(OCR hoặc nguồn khuyết\), ghi □; cần đối chiếu ảnh gốc\.$")
+_OLD = r"(?:; cần đối chiếu ảnh(?: gốc)?(?: để nhập lại)?)?"
+_N_INS = re.compile(r"^(\d+) chữ Hán OCR chưa nhận được, ghi □" + _OLD + r"\.$")
+_N_PRE = re.compile(r"^(\d+) chữ Hán không đọc được \(OCR hoặc nguồn khuyết\), ghi □" + _OLD + r"\.$")
 _SUA_PA = re.compile(r"^Sửa phiên âm lỗi OCR theo chữ Hán: (.*)\.$")
-_SUA_HAN = re.compile(r"^Sửa chữ Hán OCR theo phiên âm \(chữ gần giống/cụm từ lặp\): (.*); cần đối chiếu ảnh\.$")
-_CHE = re.compile(r"^\d+ chữ Hán OCR sai \(không khớp âm: (.*)\), ghi □; cần đối chiếu ảnh gốc\.$")
+_SUA_HAN = re.compile(r"^Sửa chữ Hán OCR theo phiên âm \(chữ gần giống/cụm từ lặp\): (.*?)" + _OLD + r"\.$")
+_CHE = re.compile(r"^\d+ chữ Hán OCR sai \(không khớp âm: (.*)\), ghi □" + _OLD + r"\.$")
 _PA_THIEU = re.compile(r"^Phiên âm thiếu (\d+) âm tiết so với bản Hán \(OCR đọc: (.*)\), ghi □ ở cả chữ Hán và "
-                       r"phiên âm; cần đối chiếu ảnh\.$")
+                       r"phiên âm" + _OLD + r"\.$")
 _DN_MISS = "Bản dịch khuyết đoạn tương ứng, ghi [...]."
 
 
@@ -30,7 +31,7 @@ def split_han_by_pa(han: str, pa_parts: list[str], readings: Readings | None) ->
     counts = [len(syllables(p)) for p in pa_parts]
     if len(pos) == sum(counts):
         owner = [r for r, c in enumerate(counts) for _ in range(c)]
-    else:  # lệch số chữ: gán theo dóng chữ–âm tiết
+    else:
         syl_row = [r for r, c in enumerate(counts) for _ in range(c)]
         syls = [s for p in pa_parts for s in syllables(p)]
         chars = [han[k] for k in pos]
@@ -41,7 +42,7 @@ def split_han_by_pa(han: str, pa_parts: list[str], readings: Readings | None) ->
                     cur = syl_row[sj]
                 if ci is not None:
                     owner[ci] = cur
-        else:  # không có từ điển: chia theo tỉ lệ
+        else:
             tot = max(sum(counts), 1)
             bounds, acc = [], 0
             for c in counts:
@@ -121,12 +122,11 @@ def distribute_notes(note: str, subs: list[dict]) -> list[list[str]]:
             for r in range(n):
                 if DN_MISSING in subs[r]["dich_nghia"]:
                     out[r].append(p)
-        else:  # 'Bỏ chữ Hán OCR thừa…' và ghi chú khác: chưa biết vị trí -> dòng con chứa chữ được nhắc, mặc định dòng đầu
+        else:
             hans = [c for c in p if is_han(c)]
             r = locate(0, lambda r: bool(hans) and all(c in subs[r]["han"] for c in hans)) if hans else 0
             out[r].append(p)
 
-    # □ chưa được giải thích bởi ghi chú cụ thể: chia lại theo hai loại câu chữ ban đầu (chèn trước, có sẵn sau)
     final: list[list[str]] = []
     for r in range(n):
         notes: list[str] = []
@@ -135,20 +135,20 @@ def distribute_notes(note: str, subs: list[dict]) -> list[list[str]]:
         ins_total -= k_ins
         k_pre = min(boxes - k_ins, pre_total) if pre_total else 0
         pre_total -= k_pre
-        if boxes - k_ins - k_pre > 0:  # phòng hờ: số đếm cũ không đủ
+        if boxes - k_ins - k_pre > 0:
             k_pre += boxes - k_ins - k_pre
         if k_ins:
-            notes.append(f"{k_ins} chữ Hán OCR chưa nhận được, ghi □; cần đối chiếu ảnh gốc để nhập lại.")
+            notes.append(f"{k_ins} chữ Hán OCR chưa nhận được, ghi □.")
         if k_pre:
-            notes.append(f"{k_pre} chữ Hán không đọc được (OCR hoặc nguồn khuyết), ghi □; cần đối chiếu ảnh gốc.")
+            notes.append(f"{k_pre} chữ Hán không đọc được (OCR hoặc nguồn khuyết), ghi □.")
         if sua_pa[r]:
             notes.append("Sửa phiên âm lỗi OCR theo chữ Hán: " + ", ".join(sua_pa[r]) + ".")
         if sua_han[r]:
             notes.append("Sửa chữ Hán OCR theo phiên âm (chữ gần giống/cụm từ lặp): " + ", ".join(sua_han[r])
-                         + "; cần đối chiếu ảnh.")
+                         + ".")
         if che[r]:
             notes.append(f"{len(che[r])} chữ Hán OCR sai (không khớp âm: " + ", ".join(che[r])
-                         + "), ghi □; cần đối chiếu ảnh gốc.")
+                         + "), ghi □.")
         final.append(notes + out[r])
     return final
 
@@ -163,7 +163,7 @@ def split_row(row: dict, readings: Readings | None) -> list[dict]:
         return [row]
     pa_parts = [p for p, _ in pairs]
     hans = split_han_by_pa(row["han"], pa_parts, readings)
-    if any(not h for h in hans):  # phần Hán rỗng (OCR thiếu nhiều): không tách để khỏi tạo dòng không có Hán
+    if any(not h for h in hans):
         return [row]
     subs = [{**row, "han": h, "phien_am": clean_cell(p), "dich_nghia": clean_cell(d)}
             for h, (p, d) in zip(hans, pairs)]

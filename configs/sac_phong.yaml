@@ -1,4 +1,3 @@
-# Cấu hình nhóm sách, dự kiến kế thừa base.yaml khi có bộ nạp.
 books: [R1001, R1003]
 has_phien_am: true
 han_input: scan

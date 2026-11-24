@@ -15,11 +15,13 @@ Mọi lệnh chạy **từ thư mục gốc repo** trên PowerShell. macOS/Linux
 ## 1. Cài đặt (làm một lần)
 
 ```powershell
-cd D:\NMXLNNTN\han-viet-alignment
+git clone <url-repo> han-viet-alignment
+cd han-viet-alignment
 python -m venv venv
 .\venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
-Cần Python ≥ 3.11.
+Môi trường đã chạy: Python 3.12.0, Windows 11 (64-bit), RAM 16 GB, chạy trên CPU (không cần GPU).
+Mọi thư viện trong `requirements.txt` đã được cố định phiên bản.
 
 Tải model OCR tiếng Việt:
 ```powershell
@@ -80,18 +82,23 @@ Tắt giao diện sửa (`tools/fix_ui`) trước khi chạy. Mỗi file chỉ c
 ```powershell
 .\venv\Scripts\python.exe dong_hang_minh_menh.py --ma-sach R1204 --force
 ```
-Chữ Hán không có dấu câu nên máy chỉ cắt ở chỗ chắc chắn; chỗ không chắc thì **gộp 2 câu dịch vào một cặp**
-(gộp vẫn đúng nghĩa, cắt sai thì hỏng cả hai cặp). Mức gộp chỉnh bằng `--nguong-gop`:
+Bản Hán không có dấu câu, nên ranh giới câu Hán được suy ra từ bản dịch. Script chỉ cắt ở những ranh giới có
+độ tin cậy đủ cao. Ở ranh giới không chắc chắn, hai câu dịch liền nhau được **gộp vào một cặp (kiểu 1–n,
+HD 3.1)**: gộp vẫn giữ đúng quan hệ dịch, còn cắt sai sẽ làm hỏng cả hai cặp.
 
-| `--nguong-gop` | Số cặp (cả 3 sách) | Lỗi ước lượng |
+Tham số `--nguong-gop` quy định độ tin cậy tối thiểu để giữ một điểm cắt. Ngưỡng càng cao thì càng gộp nhiều,
+cặp ít hơn nhưng ranh giới chính xác hơn. Giá trị mặc định theo từng sách nằm trong `NGUONG_GOP` của
+`dong_hang_minh_menh.py` (R1204 = 1.25, R1205 = 1.25, R1206 = 1.75). Các giá trị này được chọn trên mẫu
+đánh giá ranh giới ở `docs/danh_gia_minh_menh/`:
+
+| `--nguong-gop` | Số cặp (cả 3 sách) | Tỷ lệ cặp lệch ranh giới ước lượng |
 | --- | --- | --- |
-| 1.0 | ~2.540 | ~30% |
 | 1.25 | ~2.240 | ~23% |
 | 1.5 | ~2.000 | ~20% |
 | 1.75 | ~1.750 | ~10% |
 
-Mặc định: R1204 = 1.25, R1205 = 1.25, R1206 = 1.75. Số cao hơn → ít cặp hơn nhưng ít lỗi hơn.
-Lỗi ước lượng tính trên mẫu nhỏ do mô hình AI chấm (`docs/danh_gia_minh_menh/`), **vẫn phải chấm tay** (mục 5).
+Tỷ lệ trên là **ước lượng** từ một mẫu nhỏ (141 khối / 404 ranh giới) do mô hình ngôn ngữ gán nhãn (xem mục 7),
+**chưa được người chấm lại**. Trước khi nộp, phải chấm tay mẫu ngẫu nhiên theo mục 5.
 
 Kết quả: `R1204/04_dong_hang/R1204_parallel.tsv` + `.xlsx` và `workspace/R1204/review_minh_menh.tsv`
 (xem trước các cặp có cờ `RANH_GIOI_SAT_NGUONG`).
@@ -153,6 +160,9 @@ Yêu cầu:
 Nộp file `<MSSV1_MSSV2_MSSV3_MSSV4>.zip` gồm các thư mục `<MA_SACH>/` (01–04), `_report.pdf`
 và `source.zip` (mã nguồn + README.md + USER_GUIDE.md + requirements.txt, **không** kèm API key).
 
+Trang mục lục và trang xuất bản không có bản Hán tương ứng nên không đưa vào dóng hàng. Danh sách các khối OCR
+bị loại và lý do nằm trong `<MA_SACH>/summary.json` (trường `excluded_docs`; vd R1001.254–257).
+
 ---
 
 ## 6. Lỗi thường gặp
@@ -164,6 +174,22 @@ và `source.zip` (mã nguồn + README.md + USER_GUIDE.md + requirements.txt, **
 | `Không tìm thấy PDF` | Đặt PDF vào `docs-local/NLP-20261101T150232Z-1-001/NLP/` |
 | `FileNotFoundError: vietocr_configs/base.yml` | Chạy lệnh từ thư mục gốc repo; làm lại mục 1 |
 | `đã có file dóng hàng` | Đã sửa tay → `--sync xlsx`; muốn làm lại từ đầu → `--force` (mất bản sửa tay) |
+
+---
+
+## 7. Mô hình ngôn ngữ / công cụ trả phí đã dùng
+
+Theo quy định chung (phần Quy định về mã nguồn), mọi công cụ hoặc mô hình có tính phí phải được ghi rõ mô hình,
+prompt và cách cài đặt. Pipeline OCR và dóng hàng ở các mục 2–3 **không** gọi dịch vụ trả phí nào. Mô hình
+ngôn ngữ chỉ được dùng ở hai việc dưới đây và **không dùng để dịch, dịch bù hay viết lại bản dịch** (HD mục 1).
+
+| Việc | Mô hình / công cụ | Đầu vào → đầu ra | Prompt |
+| --- | --- | --- | --- |
+| Gán nhãn ranh giới đúng cho mẫu đánh giá Minh Mệnh (dùng để chọn `--nguong-gop`) | Claude (Anthropic) <!-- TODO: ghi phiên bản mô hình đã dùng --> | `docs/danh_gia_minh_menh/*.md` → `*.labels.json` | <!-- TODO: dán nguyên văn prompt đã dùng --> |
+| Hỗ trợ viết code và hiệu đính dữ liệu sắc phong R1001/R1003: đối chiếu ảnh trang sách để điền câu niên đại OCR bỏ sót, chép lại phiên âm và dịch nghĩa **đúng như sách in** cho các văn bản OCR hỏng nặng (R1001.032, R1001.253, R1003.139, .175, .231, .260, .394) rồi dóng lại | Claude Opus 5.5 qua Claude Code (CLI) | Ảnh trong `02_ocr_tho/viet/` và `cache_pages/` → TSV `04_dong_hang/` | Yêu cầu bằng lời: sửa theo nhận xét của người duyệt, đối chiếu ảnh trang sách |
+
+Cài đặt Claude Code: `npm install -g @anthropic-ai/claude-code`, rồi chạy `claude` và đăng nhập bằng tài khoản
+Anthropic. Không lưu API key trong repo.
 
 ---
 

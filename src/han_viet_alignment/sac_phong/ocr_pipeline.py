@@ -21,7 +21,6 @@ from rapidocr_onnxruntime import RapidOCR
 from vietocr.tool.config import Cfg
 from vietocr.tool.predictor import Predictor
 
-# Khởi tạo singletons
 _rapid_han = None
 _rapid_det = None
 _vietocr_predictor = None
@@ -42,7 +41,6 @@ def get_han_engine():
         v6_det = v6_dir / "PP-OCRv6_det_medium.onnx"
         v6_rec = v6_dir / "PP-OCRv6_rec_medium.onnx"
 
-        # Tự động tải nếu máy thành viên khác chưa có model v6
         if not (v6_det.exists() and v6_rec.exists()):
             try:
                 print("[*] Đang tải mô hình Paddle v6 (PP-OCRv6 Medium) từ HuggingFace...")
@@ -63,10 +61,6 @@ def get_han_engine():
         _rapid_han.text_det.postprocess_op.thresh = 0.15
         _rapid_han.text_det.postprocess_op.box_thresh = 0.20
         _rapid_han.text_det.postprocess_op.unclip_ratio = 1.8
-        # RapidOCR bỏ cả dòng có điểm < text_score. Đã đo trên R1001.001–007 qua đường xử lý thật,
-        # chấm như kiem_tra_du_lieu.py: 0.5 -> 201/423 (47,5%); 0.1 -> 203/467 (43,5%);
-        # 0.1 + lọc dòng rác (alignment/han_filter.py) -> 201/450 (44,7%). Hạ ngưỡng chủ yếu thêm chữ sai
-        # nên giữ 0.5. Với 0.5, bộ lọc han_filter không loại gì (chỉ xét dòng điểm < 0.5).
         _rapid_han.text_score = 0.5
     return _rapid_han
 
@@ -105,8 +99,6 @@ def clean_and_correct_sac_phong_viet(text: str, is_dich_nghia: bool = False) -> 
     if not text:
         return ""
         
-    # Nếu là Dịch nghĩa: dừng ngay sau dòng Ngày tháng năm dương lịch kết thúc bài cuối cùng
-    # (tránh cắt nhầm các mục "Phụng sao..." liệt kê nhiều niên hiệu nối tiếp trong cùng bài)
     if is_dich_nghia:
         m_all = list(re.finditer(
             r'ngày\s+\d+[^()]{0,65}?\(\s*(?:17|18|19|20)\d\d\s*\)[\.:]?',
@@ -119,9 +111,7 @@ def clean_and_correct_sac_phong_viet(text: str, is_dich_nghia: bool = False) -> 
             if not re.search(r'\bban\s*t[ặa]ng|\bm[ĩi]\s*t[ựư]|\bchu[ẩa]n\s*cho|\bs[ắa]c\s*phong', tail[:100], re.IGNORECASE):
                 text = text[:m_end.end()].strip()
             
-    # Bảng quy tắc chuẩn hóa văn phong sắc phong triều Nguyễn
     rules = [
-        # Lỗi cụm từ mở đầu & phong thần
         (r'Sắc\s+barchocan\s+san', 'Sắc ban cho Cao Sơn'),
         (r'Sặc\s+ban\s+cho', 'Sắc ban cho'),
         (r'Sắc\s+barchocan', 'Sắc ban cho'),
@@ -137,13 +127,11 @@ def clean_and_correct_sac_phong_viet(text: str, is_dich_nghia: bool = False) -> 
         (r'mong\s+thân\s+hay\s+Phu\s+họ\s+che\s+chôchodân\s*2ủa\s*ta', 'mong thần hãy phù hộ che chở cho dân của ta'),
         (r'mong\s+th[aâ]n\s+h[aã]y\s+ph[uù]\s+h[oộ]\s+che\s+chở\s+cho\s+d[aâ]n\s+c[uủ]a\s+ta', 'mong thần hãy phù hộ che chở cho dân của ta'),
         
-        # Kết thúc câu chuẩn
         (r'Kính\s+c[aẩấ]n\s+thay[ềl1!:]*', 'Kính cẩn thay!'),
         (r'Kinh\s+c[aâ]n\s+thay[ềl1!:]*', 'Kính cẩn thay!'),
         (r'Khâm\s+tai[1!\]:]*', 'Khâm tai!'),
         (r'Kham\s*tai[1!\]:]*', 'Khâm tai!'),
         
-        # Từ xưng hô & niên hiệu triều đình
         (r'\btrâm\b|\btrãm\b|\[trâm\]|\[trãm\]', 'trẫm'),
         (r'\btrờn\b', 'tròn'),
         (r'\bđạile\b', 'đại lễ'),
@@ -187,7 +175,6 @@ def clean_and_correct_sac_phong_viet(text: str, is_dich_nghia: bool = False) -> 
         (r'\blelong\b|\blêlong\b|\blếlong\b', 'lễ long'),
         (r'(\d+)\s*tháng\s*(\d+)', r'\1 tháng \2'),
         
-        # Ghép các âm tiết bị OCR tách khoảng trắng nhầm
         (r'\bMi\s+nh\b', 'Minh'),
         (r'\bHủ\s+ng\b', 'Hùng'),
         (r'\btò\s+ng\b', 'tòng'),
@@ -232,12 +219,10 @@ def format_han_content(raw_text: str) -> str:
     """
     if not raw_text:
         return ""
-    # Chuẩn hóa tất cả các biến thể ô vuông hoặc ký tự hỏng về đúng □ (U+25A1)
     text = re.sub(r'[\u25a0-\u25a9\u25fc\u3013\ufffd\u25ad-\u25b0]', '□', raw_text)
     valid_chars = []
     for ch in text:
         cp = ord(ch)
-        # CJK Unified Ideographs, Extension A-H, Compatibility
         if (0x4e00 <= cp <= 0x9fff or 0x3400 <= cp <= 0x4dbf or 
             0xf900 <= cp <= 0xfaff or 0x20000 <= cp <= 0x323af or 
             ch in '□、。，；：·「」『』'):
@@ -290,7 +275,6 @@ def format_dich_nghia_content(raw_text: str) -> str:
         cleaned_lines.append(l)
     text = ' '.join(cleaned_lines)
     
-    # Cắt bỏ phần chú thích chân trang địa danh xuất hiện sau năm dương lịch cuối cùng
     m = list(re.finditer(r'\(\s*(?:17|18|19|20)\d\d\s*\)', text))
     if m:
         last_year = m[-1]
@@ -381,7 +365,6 @@ def _estimate_skew_angle(mask: np.ndarray) -> float:
         return 0.0
     small = cv2.resize(mask, (max(40, w_m // 4), max(20, h_m // 4)), interpolation=cv2.INTER_NEAREST)
     sh, sw = small.shape
-    # Bỏ rìa 4px để viền cắt ảnh không chi phối phương sai
     if sh > 10:
         small[:3, :] = 0
         small[-3:, :] = 0
@@ -443,11 +426,9 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
         gray = gray0
         diff = diff0
 
-    # Ngưỡng mực in rõ (loại bỏ vết mực hằn mặt sau)
     mask_text = (diff > 48).astype(np.uint8)
     mask_strong = (diff > 56).astype(np.uint8)
 
-    # Xóa nhiễu viền ngoài cùng do cắt trang
     pad_y = min(8, h_img // 10)
     pad_x = min(6, w_img // 10)
     if pad_y > 0:
@@ -461,7 +442,6 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
         mask_strong[:, :pad_x] = 0
         mask_strong[:, -pad_x:] = 0
 
-    # Xóa đường kẻ ngang chú thích chân trang bằng MorphOpen (150x1)
     if w_img > 160:
         horiz_k = cv2.getStructuringElement(cv2.MORPH_RECT, (150, 1))
         h_lines = cv2.morphologyEx(mask_text, cv2.MORPH_OPEN, horiz_k)
@@ -476,13 +456,11 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
     kernel = np.array([0.03, 0.08, 0.18, 0.42, 0.18, 0.08, 0.03], dtype=np.float32)
     smooth = np.convolve(row_proj, kernel, mode="same")
 
-    # Giữ cả peak yếu của tiêu đề ngắn ('Phiên âm:', 'Cố sắc!', 'Dịch nghĩa:')
     cand_peaks = []
     for y in range(1, h_img - 1):
         if smooth[y] >= 6.0 and smooth[y] >= smooth[y - 1] and smooth[y] >= smooth[y + 1]:
             cand_peaks.append((float(smooth[y]), y))
 
-    # NMS giữ các dòng cách nhau tối thiểu 22px
     cand_peaks.sort(reverse=True)
     peaks = []
     for _, y in cand_peaks:
@@ -527,7 +505,6 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
         if len(dark_cols) == 0:
             continue
 
-        # Nhóm các cột có mực đậm theo khoảng hở <= 45px để không kéo đốm xa vào dòng ngắn
         clusters = []
         c_start = int(dark_cols[0])
         c_prev = int(dark_cols[0])
@@ -554,12 +531,10 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
             active_cols_mask = col_dark > 0
             mean_col_h = float(col_dark[active_cols_mask].mean()) if active_cols_mask.any() else 0.0
 
-            # Lọc đốm nhiễu/hằn mặt sau rời rạc
             if very_dark < 22 or seg_ink < 55 or (seg_w < 12 and seg_ink < 65):
                 continue
             if (float(seg_ink) / float(seg_w)) < 1.3 or fill < 0.045:
                 continue
-            # Lọc rìa khung ảnh đậm đặc (fill > 0.36) và đường kẻ ngang chân trang / mảnh gãy của nó
             if fill > 0.36:
                 continue
             if seg_w >= 80 and zero_ratio < 0.08:
@@ -577,7 +552,6 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
         x0_all = valid_sub_rects[0][0]
         x1_all = valid_sub_rects[-1][2]
         line_w = x1_all - x0_all
-        # Bỏ dải bóng mép trên/dưới cùng sát rìa cắt ảnh
         if (y0 <= 12 or y1 >= h_img - 10) and (y1 - y0 <= 22 or line_w > 400):
             line_gray = gray[y0:y1, x0_all:x1_all]
             lc = (line_gray < 160).sum(axis=0)
@@ -586,8 +560,6 @@ def _segment_viet_lines_projection(full_img: np.ndarray, return_work_img: bool =
             if lz < 0.14 or lmch < 5.5 or y1 >= h_img - 10:
                 continue
 
-        # Với dòng ngắn đơn lẻ (như 'Phiên âm:', 'Dịch nghĩa:', 'Khâm tai!', 'Kính cẩn thay!'),
-        # tìm thung lũng cục bộ trong đúng vùng X [x0_all:x1_all] giữa các peak kề cận (tránh dính chữ dòng dưới)
         if len(valid_sub_rects) == 1 and line_w < 950:
             prev_bound = max(0, pk - max_half_h) if i == 0 else peaks[i - 1]
             next_bound = min(h_img - 1, pk + max_half_h) if i == len(peaks) - 1 else peaks[i + 1]
@@ -676,13 +648,11 @@ def split_pa_dn(lines: list[str]) -> tuple[str, str]:
             continue
         l_lower = line.lower().strip()
 
-        # Bỏ qua footnote chú thích chân trang và chú thích sao chép
         if l_lower.startswith("*") or "*nay" in l_lower or "khu phố" in l_lower or "sao chép tại" in l_lower:
             continue
         if archival_note_pat.search(l_lower):
             continue
 
-        # Xử lý tiêu đề Dịch nghĩa trước để không nhầm khi sau dấu ':' có chữ Sắc
         m_dn = dn_header_strict_pat.search(l_lower)
         if m_dn or (len(l_lower) < 28 and dn_header_noisy_pat.search(l_lower)):
             current_section = "dn"
@@ -696,7 +666,6 @@ def split_pa_dn(lines: list[str]) -> tuple[str, str]:
                     dich_nghia_lines.append(tail)
             continue
 
-        # Tiêu đề Phiên âm
         m_pa = pa_header_pat.search(l_lower)
         if m_pa:
             current_section = "pa"
@@ -711,21 +680,17 @@ def split_pa_dn(lines: list[str]) -> tuple[str, str]:
                     phien_am_lines.append(tail)
             continue
 
-        # Dòng niên hiệu âm lịch (... niên ... nguyệt ... nhật ở cuối dòng) kết thúc phần Phiên âm
-        # Tránh nhầm giữa các mục "Phụng sao lịch đại..." (chứa 'sắc phong:' dài phía sau chữ nhật)
         if current_section == "pa" and date_end_pat.search(l_lower) and "sắc phong" not in l_lower:
             phien_am_lines.append(line)
             seen_end_pa = True
             current_section = "dn"
             continue
 
-        # Phát hiện dấu kết thúc 'Khâm tai' hoặc 'Cố sắc'
         if current_section == "pa" and end_pa_pat.search(l_lower):
             phien_am_lines.append(line)
             seen_end_pa = True
             continue
 
-        # Ngay sau 'Khâm tai' / 'Cố sắc': thu nốt dòng ngày âm lịch (nếu có) rồi chuyển sang Dịch nghĩa
         if seen_end_pa and current_section == "pa":
             if dn_strong_body_pat.search(l_lower):
                 current_section = "dn"
@@ -742,11 +707,9 @@ def split_pa_dn(lines: list[str]) -> tuple[str, str]:
             else:
                 current_section = "dn"
 
-        # Fallback: gặp cụm mở đầu đặc trưng của bản Dịch nghĩa
         if current_section == "pa" and dn_strong_body_pat.search(l_lower):
             current_section = "dn"
 
-        # Loại bỏ dòng tiêu đề Dịch nghĩa bị OCR hỏng quá nặng thành ký tự rác (< 18 ký tự)
         if (
             current_section == "dn"
             and len(dich_nghia_lines) == 0
@@ -780,7 +743,6 @@ def process_viet_ocr(viet_img_path: str, doc_id: str):
 
     h_img, w_img = full_img.shape[:2]
 
-    # Layout A khổ rộng (> 1800px): dùng Peak-Valley Projection chống gộp dòng DBNet
     rects = []
     used_projection = False
     work_img = full_img
@@ -807,7 +769,6 @@ def process_viet_ocr(viet_img_path: str, doc_id: str):
                 "orig_box": box,
             })
 
-        # Khử overlap chiều dọc trên box DBNet
         for idx in range(len(rects) - 1):
             r_curr = rects[idx]
             r_next = rects[idx + 1]
@@ -866,12 +827,10 @@ def process_han_ocr(han_img_path: str, doc_id: str):
         return "", []
         
     H, W = img.shape[:2]
-    # Xoay 90 độ CCW: cột dọc từ trên xuống biến thành dòng ngang từ trái sang phải
     rot_ccw = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
     res, _ = engine(rot_ccw)
     
     if not res:
-        # Fallback nếu xoay không ra thì chạy trực tiếp
         res_direct, _ = engine(img)
         if not res_direct:
             return "", []
@@ -890,8 +849,6 @@ def process_han_ocr(han_img_path: str, doc_id: str):
         txt = clean_text_line(text)
         if not txt:
             continue
-        # Nghịch đảo tọa độ điểm từ rot_ccw về ảnh gốc
-        # x_orig = W - 1 - y_rot, y_orig = x_rot
         orig_box = [[int(W - 1 - pt[1]), int(pt[0])] for pt in box]
         x_center = sum(p[0] for p in orig_box) / 4.0
         cols.append({
@@ -901,11 +858,9 @@ def process_han_ocr(han_img_path: str, doc_id: str):
             "score": round(float(score), 4),
         })
 
-    # Sắp xếp các cột từ PHẢI SANG TRÁI (x_center giảm dần)
     cols.sort(key=lambda c: -c["x_center"])
 
     lines = [c["text"] for c in cols]
-    # "score" (độ tin cậy nhận dạng) dùng để lọc dòng rác; bỏ khi ghi Label.txt (PPOCRLabel chỉ cần 2 khóa)
     boxes_data = [{"transcription": c["text"], "points": c["box"], "score": c["score"]} for c in cols]
     
     han_text = "\n".join(lines)

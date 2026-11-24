@@ -40,7 +40,6 @@ DICT_DIR = ROOT / "guideline" / "dict"
 HERE = Path(__file__).resolve().parent
 CORR_FIELDS = ["change_id", "doc_id", "sent_id", "field", "before", "after", "reason",
                "source_region_ids", "editor", "reviewer", "timestamp"]
-# ghi_chu dạng "敦≠Sắc" -> chữ OCR gốc của ô bị thay bằng □
 OCR_NOTE = re.compile(r"(\S)≠([^,;)\s]+)")
 
 
@@ -73,7 +72,7 @@ def load_dict():
 
 
 class Book:
-    MODES = ("pa_dn", "han")  # 1: phiên âm + dịch nghĩa, 2: chữ Hán
+    MODES = ("pa_dn", "han")
 
     def __init__(self, book: str):
         self.book = book
@@ -104,7 +103,6 @@ class Book:
                         self.labels[img.strip()] = json.loads(js)
                     except json.JSONDecodeError:
                         pass
-        # trạng thái verify: {sent_id: {"pa_dn": {...}, "han": {...}}} — file riêng, không thêm cột vào TSV
         self.review = json.loads(self.review_path.read_text(encoding="utf-8")) if self.review_path.exists() else {}
         self.freq = Counter(ch for row in self.rows for ch in row["han"] if is_han(ch))
 
@@ -120,7 +118,6 @@ class Book:
         return list(out.values())
 
     def _sent(self, row):
-        # [chữ OCR gốc, âm] lấy từ ghi_chu; giao diện gán cho ô □ có âm trùng
         ocr_hints = [[m.group(1), m.group(2)] for m in OCR_NOTE.finditer(row.get("ghi_chu", ""))]
         return {"sent_id": row["sent_id"], "han": row["han"], "phien_am": row["phien_am"],
                 "syls": syllables(row["phien_am"]), "dich_nghia": row["dich_nghia"],

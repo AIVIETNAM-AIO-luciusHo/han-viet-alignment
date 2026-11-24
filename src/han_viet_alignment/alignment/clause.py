@@ -25,12 +25,12 @@ _STOP = {unicodedata.normalize("NFD", w).encode("ascii", "ignore").decode().repl
          for w in """và của cho là thì mà đã được các những này kia ấy nay đó rằng vậy cũng như với để ở tại
          trong ngoài trên dưới vì nên khi lại đều có không một hai ba ta người việc ra vào theo từ đến tới
          chi dĩ nhi vi kỳ kì giả dã hồ vu ư thị hữu vô bất chư sở năm tháng ngày thứ""".split()}
-_MAX = 4          # số mệnh đề tối đa mỗi vế trong một cặp con (ngoài cặp 'giữ nguyên')
-_W_CROSS = 3.0    # phạt mỗi từ neo bị bắt chéo sang cặp khác
-_W_LEN = 1.6      # phạt lệch độ dài (log tỉ lệ, sau ngưỡng)
-_LEN_FREE = 0.35  # lệch log-tỉ-lệ dưới ngưỡng này coi như bình thường
-_MARGIN = 0.6     # ranh giới thay thế có điểm kém hơn < _MARGIN -> coi là mơ hồ, gộp
-_MIN_SYL = 2      # mệnh đề phiên âm < 2 âm tiết ('Sắc,') gộp vào mệnh đề sau
+_MAX = 4
+_W_CROSS = 3.0
+_W_LEN = 1.6
+_LEN_FREE = 0.35
+_MARGIN = 0.6
+_MIN_SYL = 2
 
 
 def _fold(s: str) -> str:
@@ -111,13 +111,12 @@ def refine_pair(pa: str, dn: str) -> list[tuple[str, str]]:
                 continue
             for a in range(1, m - i + 1):
                 for b in range(1, n - j + 1):
-                    # cặp con lớn chỉ cho phép khi nó phủ hết phần còn lại (gộp đuôi)
                     if (a > _MAX or b > _MAX) and not (i + a == m and j + b == n):
                         continue
                     s = dp[i][j] + sc.bead(i, i + a, j, j + b)
                     if s > dp[i + a][j + b]:
                         dp[i + a][j + b], bt[i + a][j + b] = s, (a, b)
-    cuts = []  # các điểm (i, j) cuối mỗi cặp con
+    cuts = []
     i, j = m, n
     while i or j:
         a, b = bt[i][j]
@@ -125,7 +124,6 @@ def refine_pair(pa: str, dn: str) -> list[tuple[str, str]]:
         i, j = i - a, j - b
     cuts = [(0, 0)] + cuts[::-1]
 
-    # Gộp ranh giới mơ hồ: thử dời ranh giới (i, j) sang (i±1, j) hoặc (i, j±1) giữa hai cặp kề.
     changed = True
     while changed and len(cuts) > 2:
         changed = False

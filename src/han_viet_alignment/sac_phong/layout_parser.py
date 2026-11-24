@@ -15,13 +15,11 @@ from pathlib import Path
 from PIL import Image
 
 
-# ─────────────────────────── Hằng số margin ───────────────────────────────
-# Tỉ lệ cắt biên để bỏ header tiêu đề và footer số trang
-_MARGIN_TOP_RATIO = 0.075   # bỏ 7.5% trên (header "SẮC PHONG LƯU TẠI…")
-_MARGIN_BOT_RATIO = 0.955   # giữ đến 95.5% chiều cao (bỏ footer số trang)
-_MARGIN_L_RATIO   = 0.020   # bỏ 2% trái
-_MARGIN_R_RATIO   = 0.985   # giữ đến 98.5% chiều rộng (vùng Hán)
-_MARGIN_VIET_R_RATIO = 0.998  # giữ sát mép phải 99.8% cho vùng Quốc ngữ để không cắt mất chữ cuối dòng
+_MARGIN_TOP_RATIO = 0.075
+_MARGIN_BOT_RATIO = 0.955
+_MARGIN_L_RATIO   = 0.020
+_MARGIN_R_RATIO   = 0.985
+_MARGIN_VIET_R_RATIO = 0.998
 
 
 def _margins(h: int, w: int):
@@ -34,7 +32,6 @@ def _margins(h: int, w: int):
     )
 
 
-# ─────────────────────────── Phát hiện Layout ─────────────────────────────
 
 def detect_layout(img_path: str) -> str:
     """
@@ -48,14 +45,10 @@ def detect_layout(img_path: str) -> str:
     arr = np.array(img, dtype=np.float32)
     h, w = arr.shape[:2]
 
-    # Vùng kiểm tra: góc trên bên phải (nơi chứa cột text nếu là Layout B, hoặc chứa thân sắc phong nếu là Layout A)
     top_right = arr[int(h * 0.20):int(h * 0.45), int(w * 0.72):int(w * 0.88)]
     
-    # Tỉ lệ pixel trắng tinh của giấy in
     white_ratio = (top_right.mean(axis=2) > 230).mean()
     
-    # Độ chênh lệch màu: giấy in trắng/xám có R ≈ G ≈ B nên color_diff < 15.
-    # Trong khi sắc phong có màu vàng/cam/đỏ nên color_diff > 20.
     color_diff = (
         np.abs(top_right[:, :, 0] - top_right[:, :, 1]) +
         np.abs(top_right[:, :, 1] - top_right[:, :, 2])
@@ -67,7 +60,6 @@ def detect_layout(img_path: str) -> str:
     return 'B' if is_layout_b else 'A'
 
 
-# ─────────────────────── Tìm điểm cắt Layout A ────────────────────────────
 
 def _find_split_y_layout_a(arr: np.ndarray, h: int, w: int) -> int:
     """
@@ -87,18 +79,17 @@ def _find_split_y_layout_a(arr: np.ndarray, h: int, w: int) -> int:
     search_start = int(h * 0.35)
     search_end   = int(h * 0.75)
     max_jump = 0
-    split_y  = int(h * 0.60)  # fallback
+    split_y  = int(h * 0.60)
 
     for r in range(search_start, search_end - 20):
         jump = smoothed[r + 20] - smoothed[r]
         if jump > max_jump:
             max_jump = jump
-            split_y = r + 10  # dịch về phía sau điểm jump
+            split_y = r + 10
 
     return split_y
 
 
-# ─────────────────────── Tìm điểm cắt Layout B ────────────────────────────
 
 def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
     """
@@ -114,7 +105,6 @@ def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
     kernel_size = 100
     kernel = np.ones(kernel_size) / kernel_size
 
-    # --- Tìm split_x ---
     core = arr[int(h * 0.1):int(h * 0.9), :]
     col_br = np.array([core[:, c].mean() for c in range(w)], dtype=np.float32)
     smoothed_x = np.convolve(col_br, kernel, mode='same')
@@ -122,7 +112,7 @@ def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
     search_x_start = int(w * 0.40)
     search_x_end   = int(w * 0.70)
     max_drop = 0
-    split_x  = int(w * 0.58)  # fallback
+    split_x  = int(w * 0.58)
 
     for c in range(search_x_end, search_x_start, -1):
         drop = smoothed_x[c] - smoothed_x[c - 50]
@@ -130,7 +120,6 @@ def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
             max_drop = drop
             split_x = c - 25
 
-    # --- Tìm split_y ---
     left_strip = arr[:, int(w * 0.05):int(split_x * 0.9)]
     row_br = np.array([left_strip[r, :].mean() for r in range(h)], dtype=np.float32)
     smoothed_y = np.convolve(row_br, kernel, mode='same')
@@ -138,7 +127,7 @@ def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
     search_y_start = int(h * 0.35)
     search_y_end   = int(h * 0.65)
     max_br = 0
-    split_y = int(h * 0.50)  # fallback
+    split_y = int(h * 0.50)
 
     for r in range(search_y_start, search_y_end):
         if smoothed_y[r] > max_br:
@@ -148,7 +137,6 @@ def _find_split_layout_b(arr: np.ndarray, h: int, w: int):
     return split_x, split_y
 
 
-# ─────────────────────── Hàm chính: crop trang ────────────────────────────
 
 def process_and_crop_page(
     img_path: str,
@@ -188,7 +176,6 @@ def process_and_crop_page(
     layout = detect_layout(str(img_path))
     docs   = []
 
-    # ── Layout A: 1 sắc phong ──
     if layout == 'A':
         doc_id = f"{ma_sach}.{doc_counter:03d}"
         sy = _find_split_y_layout_a(arr, h, w)
@@ -209,7 +196,6 @@ def process_and_crop_page(
         })
         print(f"[+] Trang {page_num} (Layout A): {doc_id}  |  split_y={sy} ({sy/h*100:.1f}%)")
 
-    # ── Layout B: 2 sắc phong ──
     else:
         sx, sy = _find_split_layout_b(arr, h, w)
 
@@ -221,10 +207,8 @@ def process_and_crop_page(
         han2_file  = out_han_dir  / f"{doc2_id}_1.jpg"
         viet2_file = out_viet_dir / f"{doc2_id}_1.jpg"
 
-        # Tờ 1: trái trên / phải trên
         img.crop((ml, mt, sx, sy)).save(han1_file,  quality=95)
         img.crop((sx, mt, mr_viet, sy)).save(viet1_file, quality=95)
-        # Tờ 2: trái dưới / phải dưới
         img.crop((ml, sy, sx, mb)).save(han2_file,  quality=95)
         img.crop((sx, sy, mr_viet, mb)).save(viet2_file, quality=95)
 
@@ -252,7 +236,6 @@ def process_and_crop_page(
     return docs
 
 
-# ─────────────────────── Quick test ───────────────────────────────────────
 if __name__ == "__main__":
     import os
     os.makedirs("test_layout_output/02_ocr_tho/han",  exist_ok=True)

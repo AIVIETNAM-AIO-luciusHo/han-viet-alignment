@@ -17,20 +17,20 @@ from ..common.dictionary import Readings
 from ..common.text import HAN_PUNCT, MISSING, is_han, syl_key, syllables
 from .correction import MAX_N, PhraseMemory, fix_syllable, fix_tone, shape_candidates, tone_only
 
-_SYL = re.compile(r"[\w□]+")  # cùng cách tách âm tiết với syllables()/script kiểm tra
+_SYL = re.compile(r"[\w□]+")
 
 
 @dataclass
 class HanSplit:
-    segments: list[str]            # chuỗi Hán cho từng câu phiên âm (giữ dấu câu Hán nếu có)
-    trailing_extra: str = ""       # chữ Hán thừa ở cuối văn bản, không dóng được với âm tiết nào
-    leading_extra: str = ""        # chữ Hán thừa ở đầu văn bản
-    ops: list[tuple[str, str, str]] = field(default_factory=list)  # (op, chữ, âm) để báo cáo
-    inserted: list[int] = field(default_factory=list)  # số □ đã chèn (OCR thiếu chữ) cho từng câu
-    pa_rows: list[str] = field(default_factory=list)   # phiên âm từng câu sau khi sửa lỗi OCR
-    notes: list[list[str]] = field(default_factory=list)  # ghi_chu từng câu (chỗ đã sửa/che/bỏ)
-    flags: list[list[str]] = field(default_factory=list)  # cảnh báo review từng câu
-    masked: list[int] = field(default_factory=list)       # số chữ OCR sai đã thay bằng □
+    segments: list[str]
+    trailing_extra: str = ""
+    leading_extra: str = ""
+    ops: list[tuple[str, str, str]] = field(default_factory=list)
+    inserted: list[int] = field(default_factory=list)
+    pa_rows: list[str] = field(default_factory=list)
+    notes: list[list[str]] = field(default_factory=list)
+    flags: list[list[str]] = field(default_factory=list)
+    masked: list[int] = field(default_factory=list)
 
 
 def _align(chars: list[str], syls: list[str], readings: Readings) -> list[tuple[int | None, int | None]]:
@@ -38,8 +38,7 @@ def _align(chars: list[str], syls: list[str], readings: Readings) -> list[tuple[
     n, m = len(chars), len(syls)
     INF = 10 ** 9
     dp = [[INF] * (m + 1) for _ in range(n + 1)]
-    bt = [[0] * (m + 1) for _ in range(n + 1)]  # 0 diag, 1 bỏ chữ, 2 bỏ âm
-    # Bỏ một □ có sẵn rẻ hơn bỏ chữ thật: □ khớp mọi âm nên nếu cùng giá, DP dễ đẩy chữ thật lệch một ô
+    bt = [[0] * (m + 1) for _ in range(n + 1)]
     del_cost = [0.5 if c == MISSING else 1.0 for c in chars]
     dp[0][0] = 0
     for i in range(1, n + 1):
@@ -93,7 +92,6 @@ def split_han(han_text: str, pa_sentences: list[str], readings: Readings,
 
     correct: sửa lỗi OCR có bằng chứng (correction.py). mask: chữ OCR lệch âm không sửa được -> □.
     """
-    # Vị trí chữ (Hán/□) trong chuỗi gốc để giữ nguyên dấu câu Hán khi cắt
     positions = [k for k, c in enumerate(han_text) if is_han(c) or c == MISSING]
     chars = [han_text[k] for k in positions]
     syls: list[str] = []
@@ -146,12 +144,10 @@ def split_han(han_text: str, pa_sentences: list[str], readings: Readings,
     inserted = [0] * n_sent
     ops: list[tuple[str, str, str]] = []
 
-    # Chữ thừa trước âm tiết đầu / sau âm tiết cuối (OCR ấn triện, viền, chữ vùng khác): tách riêng
     aligned_ci = [ci for ci, sj in pairs if ci is not None and sj is not None]
     first_ci = min(aligned_ci, default=len(chars))
     last_ci = max(aligned_ci, default=-1)
     leading, trailing = [], []
-    # Độ dài đoạn chữ thừa liên tiếp giữa văn bản mà mỗi chữ thuộc về
     inner = [ci is not None and sj is None and first_ci < ci < last_ci for ci, sj in pairs]
     run_len = [0] * len(pairs)
     p = 0
@@ -176,11 +172,10 @@ def split_han(han_text: str, pa_sentences: list[str], readings: Readings,
                 ops.append(("sub", ch, sy))
                 new_sy = (fix_syllable(sy, ch, readings) or fix_tone(ch, sy, readings, memory)) if correct else None
                 if new_sy:
-                    # Lỗi OCR/in phiên âm (âm tiết hỏng, hoặc sai dấu mà sách đọc chữ này khác): sửa theo chữ Hán
                     pa_edits[r][syl_local[sj]] = new_sy
                     fixed_pa[r].append(f"'{sy}'→'{new_sy}' ({ch})")
                 elif tone_only(ch, sy, readings):
-                    variants[r].append(f"{ch}/{sy}")  # cách đọc theo sách (vd 記 Kỷ): giữ, để người quyết định
+                    variants[r].append(f"{ch}/{sy}")
                 else:
                     new_ch = None
                     if correct and readings.is_reading(sy):
@@ -199,22 +194,16 @@ def split_han(han_text: str, pa_sentences: list[str], readings: Readings,
             elif ci > last_ci:
                 trailing.append(chars[ci])
             elif run_len[pi] >= 2 and last_sj >= 0:
-                # Đoạn ≥ 2 chữ thừa giữa văn bản: thường là câu/cụm có thật mà OCR phiên âm làm mất
-                # (vd 'Hộ quốc tý dân'). Bỏ đi thì vế Hán thiếu ý so với dịch nghĩa (lỗi OMISSION trên cặp
-                # "hợp lệ") -> ghi □ ở cả han và phien_am (mục 3), chữ OCR ghi ở ghi_chu.
                 r = syl_sent[last_sj]
                 buckets[r].append(MISSING)
                 k = syl_local[last_sj]
                 pa_suffix[r][k] = pa_suffix[r].get(k, "") + " " + MISSING
                 boxed[r].append(chars[ci])
             else:
-                # Một chữ thừa lẻ giữa văn bản (OCR lặp/ấn triện): giữ lại sẽ làm lệch số chữ/âm tiết
-                # cả câu -> bỏ khỏi cột han, ghi vào ghi_chu để đối chiếu ảnh.
                 dropped[last_sent].append(chars[ci])
                 if buckets[last_sent]:
                     buckets[last_sent][-1] += punct_after(ci)
         else:
-            # Âm tiết không có chữ Hán tương ứng (OCR bỏ sót): mỗi chữ thiếu ghi một □ (mục 3 hướng dẫn)
             last_sent = syl_sent[sj]
             buckets[last_sent].append(MISSING)
             inserted[last_sent] += 1
@@ -229,18 +218,18 @@ def split_han(han_text: str, pa_sentences: list[str], readings: Readings,
             fl.append(f"SUA_PA({len(fixed_pa[r])})")
         if fixed_han[r]:
             nt.append("Sửa chữ Hán OCR theo phiên âm (chữ gần giống/cụm từ lặp): "
-                      + ", ".join(fixed_han[r]) + "; cần đối chiếu ảnh.")
+                      + ", ".join(fixed_han[r]) + ".")
             fl.append(f"SUA_HAN({len(fixed_han[r])})")
         if masked_ch[r]:
             nt.append(f"{len(masked_ch[r])} chữ Hán OCR sai (không khớp âm: " + ", ".join(masked_ch[r])
-                      + "), ghi □; cần đối chiếu ảnh gốc.")
+                      + "), ghi □.")
             fl.append(f"CHE_CHU_SAI({len(masked_ch[r])})")
         if boxed[r]:
             nt.append(f"Phiên âm thiếu {len(boxed[r])} âm tiết so với bản Hán (OCR đọc: {''.join(boxed[r])}), "
-                      "ghi □ ở cả chữ Hán và phiên âm; cần đối chiếu ảnh.")
+                      "ghi □ ở cả chữ Hán và phiên âm.")
             fl.append(f"PA_THIEU_AM({len(boxed[r])})")
         if dropped[r]:
-            nt.append(f"Bỏ chữ Hán OCR thừa không có âm tiết tương ứng: {''.join(dropped[r])}; cần đối chiếu ảnh.")
+            nt.append(f"Bỏ chữ Hán OCR thừa không có âm tiết tương ứng: {''.join(dropped[r])}.")
             fl.append(f"BO_CHU_THUA({''.join(dropped[r])})")
         if variants[r]:
             fl.append("KHAC_DAU(" + ",".join(variants[r]) + ")")

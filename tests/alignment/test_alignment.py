@@ -47,6 +47,23 @@ class CleaningTests(unittest.TestCase):
         s = clean_dich_nghia("huyện Kim Động%, chính trị 1 thần[2]. Kính cần thayl Ngày 11 tháng 10 năm thứ 7 (1854)")
         self.assertEqual(s, "huyện Kim Động, chính trị thần. Kính cẩn thay! Ngày 11 tháng 10 năm thứ 7 (1854)")
 
+    def test_dich_nghia_drops_modern_place_note(self):
+        s = clean_dich_nghia("che chở cho dân. Kính cân thay] %Nay là thôn Xích Đằng, phường Lam Sơn, thành phố Hưng Yên")
+        self.assertEqual(s, "che chở cho dân. Kính cẩn thay!")
+        s = clean_dich_nghia("Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846) May là thân Thiết Tru. xã Bình Minh")
+        self.assertEqual(s, "Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846)")
+        self.assertEqual(clean_dich_nghia("Nay thân hãy phù hộ cho xã."), "Nay thân hãy phù hộ cho xã.")
+
+    def test_place_note_mid_text_keeps_following_sentence(self):
+        s = clean_dich_nghia("Sắc phong cho thần. Nay là thôn Xích Đằng, phường Lam Sơn, thành phố Hưng Yên. "
+                             + "Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846). " + "Kính cẩn thay! " * 12)
+        self.assertNotIn("thôn Xích Đằng", s)
+        self.assertIn("Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846)", s)
+
+    def test_dich_nghia_keeps_age(self):
+        self.assertEqual(clean_dich_nghia("mừng trẫm sinh nhật tròn 40 tuổi, ban chiếu báu"),
+                         "mừng trẫm sinh nhật tròn 40 tuổi, ban chiếu báu")
+
     def test_missing_translation(self):
         self.assertEqual(clean_dich_nghia(""), "[...]")
 
@@ -62,7 +79,6 @@ class SegmentTests(unittest.TestCase):
 
 class HanSplitTests(unittest.TestCase):
     def test_missing_chars_become_boxes(self):
-        # OCR bỏ sót 黎: chèn đúng một □ tại vị trí đó (mục 3: mỗi chữ thiếu một □)
         sp = split_han("保我民", ["bảo ngã lê dân."], READ)
         self.assertEqual(sp.segments, ["保我□民"])
         self.assertEqual(sp.inserted, [1])
@@ -89,7 +105,6 @@ class CorrectionTests(unittest.TestCase):
         return mem
 
     def test_inner_extra_han_dropped_so_counts_match(self):
-        # Chữ thừa giữa câu làm lệch số chữ -> cả dòng bị tính sai; phải bỏ và ghi chú
         sp = split_han("保我除黎民", ["bảo ngã lê dân."], READ_S, correct=False)
         self.assertEqual(sp.segments, ["保我黎民"])
         self.assertTrue(any("除" in n for n in sp.notes[0]))
@@ -112,7 +127,6 @@ class CorrectionTests(unittest.TestCase):
         self.assertEqual(sp.segments, ["保我雅民"])
 
     def test_tone_variant_kept_without_evidence(self):
-        # 記 'Kỷ' (tên chức theo sách, như MAU): không che, không sửa nếu sách không đọc 記 là 'ký' ở chỗ khác
         sp = split_han("記", ["Kỷ."], READ_S, memory=self._mem())
         self.assertEqual((sp.segments, sp.pa_rows), (["記"], ["Kỷ."]))
         sp = split_han("記", ["Kỷ."], READ_S, memory=self._mem(("記神", "ký thần")))
@@ -123,7 +137,6 @@ class PairErrorTests(unittest.TestCase):
     """Giảm cặp lỗi (mục 6–8: tỷ lệ lỗi tính trên cặp hợp lệ)."""
 
     def test_lowercase_after_long_sentence_is_new_sentence(self):
-        # OCR mất chữ hoa đầu câu: không gộp, để dóng hàng chọn đơn vị nhỏ nhất (HD 3.1)
         self.assertEqual(split_phien_am("Sắc Cao Sơn chi thần. nguyên tặng Minh đạt chi thần."),
                          ["Sắc Cao Sơn chi thần.", "nguyên tặng Minh đạt chi thần."])
 
@@ -144,7 +157,6 @@ class PairErrorTests(unittest.TestCase):
         self.assertTrue(rows[0]["phien_am"].startswith("BẢO NGÃ LÊ DÂN"))
 
     def test_inner_extra_run_boxed_on_both_sides(self):
-        # Đoạn ≥ 2 chữ thừa = phiên âm bị mất âm tiết: □ ở cả hai vế để không thành cặp "hợp lệ" thiếu ý
         sp = split_han("神其除安保我", ["thần kỳ bảo ngã."], READ_S, correct=False)
         self.assertEqual(sp.segments, ["神其□□保我"])
         self.assertEqual(sp.pa_rows, ["thần kỳ □ □ bảo ngã."])
@@ -167,8 +179,8 @@ class SimplifiedTests(unittest.TestCase):
     def test_detects_simplified_only(self):
         from han_viet_alignment.alignment.correction import simplified_only
         self.assertEqual(simplified_only("钱"), ("錢",))
-        self.assertEqual(simplified_only("发"), ("發", "髮"))  # nhiều chữ phồn: lý do không tự đổi
-        for ch in "准台后云干里余敕欽錢":  # vừa giản vừa phồn hợp lệ, hoặc vốn là phồn thể
+        self.assertEqual(simplified_only("发"), ("發", "髮"))
+        for ch in "准台后云干里余敕欽錢":
             self.assertIsNone(simplified_only(ch), ch)
 
     def test_memory_never_learns_simplified(self):
@@ -191,7 +203,6 @@ class HanFilterTests(unittest.TestCase):
         lines = ["保我黎民", "氏松著宝", "欽哉"]
         pa = "bảo ngã lê dân. Khâm tai!"
         infos = filter_han_lines(lines, [0.9, 0.3, 0.2], pa, READ)
-        # dòng 2: điểm thấp + không khớp -> loại; dòng 3: điểm thấp nhưng khớp âm -> giữ
         self.assertEqual([i.kept for i in infos], [True, False, True])
 
     def test_no_scores_means_no_filtering(self):
@@ -211,21 +222,18 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(review[1]["khop_am"], "2/2")
 
     def test_no_han_never_collapses_document(self):
-        # OCR không ra chữ Hán nào: vẫn tách câu, mỗi chữ ghi □, có ghi_chu (mục 3.1: không gộp cả văn bản)
         rows, _ = align_document(DocInput("R9999.002", "", DOC.phien_am, DOC.dich_nghia), READ, refine=False)
         self.assertEqual(len(rows), 3)
         self.assertEqual(rows[1]["han"], "□□")
         self.assertIn("□", rows[1]["ghi_chu"])
 
     def test_refine_splits_clauses(self):
-        # HD 3.1: đơn vị nhỏ nhất — mệnh đề ngăn bởi dấu phẩy được tách khi hai vế tương ứng rõ ràng
         rows, _ = align_document(DOC, READ)
         self.assertEqual([r["han"] for r in rows], ["敕神其相佑", "保我黎民", "欽哉", "嗣德柒年拾月拾壹日"])
         self.assertEqual([r["sent_id"] for r in rows], [f"R9999.001.{k}" for k in range(1, 5)])
 
     def test_refine_merges_reordered_lists(self):
         from han_viet_alignment.alignment.clause import refine_pair
-        # bản dịch đảo trật tự địa danh: không được tách chéo
         out = refine_pair("Sắc Hưng Yên tỉnh, Khoái Châu phủ, Đại Ích ấp phụng sự.",
                           "Sắc ban cho ấp Đại Ích, phủ Khoái Châu, tỉnh Hưng Yên thờ phụng.")
         self.assertEqual(len(out), 1)
@@ -235,7 +243,7 @@ class PipelineTests(unittest.TestCase):
         row = {"sent_id": "R9999.001.1", "doc_id": "R9999.001", "doc_type": "sac_phong",
                "han": "敕神其□佑保我黎民", "phien_am": "Sắc. Thần kỳ tướng hựu, bảo ngã lê dân.",
                "dich_nghia": "Sắc. Mong thần hãy phù hộ, che chở dân ta.",
-               "ghi_chu": "1 chữ Hán OCR sai (không khớp âm: 相≠tướng), ghi □; cần đối chiếu ảnh gốc."}
+               "ghi_chu": "1 chữ Hán OCR sai (không khớp âm: 相≠tướng), ghi □."}
         subs = split_row(row, READ)
         self.assertEqual([s["han"] for s in subs], ["敕神其□佑", "保我黎民"])
         self.assertIn("相≠tướng", subs[0]["ghi_chu"])
@@ -283,7 +291,6 @@ class TeacherSampleTests(unittest.TestCase):
                     self.assertEqual(pr[c], gr[c], f"{gr['sent_id']} {c}")
 
     def test_clause_rows_never_cross_sample_sentences(self):
-        # Tách mệnh đề: mỗi dòng con phải nằm gọn trong một cặp mẫu, ghép lại đúng cặp mẫu
         import pandas as pd
         from han_viet_alignment.common.dictionary import load_readings
         readings = load_readings(DICT)

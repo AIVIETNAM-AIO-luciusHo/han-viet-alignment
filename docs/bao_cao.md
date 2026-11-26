@@ -125,13 +125,13 @@ Kết quả thô lưu ở `02_ocr_tho/{han,viet}/<doc_id>.txt` và `Label.txt`, 
 | --- | --- |
 | Ngôn ngữ | Python 3.12 |
 | Hệ điều hành | Windows 11 <!-- TODO: thêm máy của nhóm B nếu khác --> |
-| Phần cứng | <!-- TODO: CPU, RAM, GPU --> |
+| Phần cứng | RAM 16 GB, chạy trên CPU (không dùng GPU) <!-- TODO: thêm CPU; máy của nhóm B nếu khác --> |
 | OCR Hán | PP-OCRv6 medium (ONNX) qua `rapidocr-onnxruntime` |
 | OCR Quốc ngữ | VietOCR `vgg_transformer` (PyTorch) |
 | Xử lý ảnh/PDF | `pypdf`, `opencv-python`, `Pillow`, `numpy` |
 | Dữ liệu bảng | `pandas`, `openpyxl` |
 | Nhận diện giản thể | `opencc-python-reimplemented` (chỉ dùng bảng tra để gắn cờ, không chuyển đổi) |
-| LLM / dịch vụ trả phí | Không sử dụng <!-- TODO: sửa nếu nhóm B có dùng; khi đó ghi rõ mô hình và prompt --> |
+| LLM / dịch vụ trả phí | Claude (Anthropic), không dùng trong pipeline OCR/dóng hàng tự động. Dùng cho: (1) gán nhãn ranh giới mẫu đánh giá Minh Mệnh (`docs/danh_gia_minh_menh/`) để chọn `--nguong-gop`; (2) qua Claude Code (Claude Opus 5.5): hỗ trợ viết code và hiệu đính sắc phong R1001/R1003 — đối chiếu ảnh trang sách để điền câu niên đại OCR bỏ sót và chép lại phiên âm/dịch nghĩa đúng như sách in cho các văn bản OCR hỏng nặng. Không dùng để dịch hay viết lại bản dịch. Chi tiết mô hình và prompt: USER_GUIDE mục 7 <!-- TODO: phiên bản mô hình và prompt của việc (1) --> |
 | Kiểm tra nhãn | PPOCRLabel |
 
 Lý do không dùng công cụ OCR Hán Nôm tại kimhannom.fit.hcmus.edu.vn: <!-- TODO: nêu lý do (vd chạy hàng loạt cục bộ, tái lập được, đã so sánh mẫu…) hoặc bổ sung nếu đã dùng -->

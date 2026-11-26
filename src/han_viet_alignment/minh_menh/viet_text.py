@@ -16,12 +16,9 @@ from ..alignment.cleaning import _FOOTNOTE_INDEX
 from ..common.text import nfc, syllables
 from .han_ocr import SHEET
 
-# "[tờ 12-a]" (R1204, R1206) hoặc chỉ "[90a]", "(90b]", "[91a}" (R1205)
 MARKER = re.compile(r"[\[(]\s*t[ờơóòởỏ]\s*:?\s*([^\])}]{0,12})[\])}]"
                     r"|[\[({]\s*(\d{1,3}\s*[-.]?\s*[abAB])\s*[\])}]", re.I)
 QUYEN_HEAD = re.compile(r"QUY[ỀỂÉÊÈE]N\s+TH[ỨỪU]", re.I)
-# Dòng niên hiệu in hoa: "NIÊN HIỆU MINH-MỆNH NĂM ĐẦU (1820)", "NĂM MINH.MỆNH THỨ HAI (1821)"
-# hoặc không có năm trong ngoặc: "MINH-MỆNH NĂM THỨ MƯỜI", "NĂM MINH.MỆNH THỨ 2" (R1205, R1206)
 YEAR_HEADER = re.compile(
     r"((?:NI[ÊE]N\s+HI[ỆE]U\s+)?(?:N[ĂA]M\s+)?MINH[\s.\-]*M[ỆE]NH\s*,?\s+(?:N[ĂA]M\s+)?"
     r"(?:TH[ỨU]\s+(?:\d{1,2}|[A-ZÀ-ỸĐ]{2,})(?:\s+[A-ZÀ-ỸĐ]{2,})*|Đ[ẦA]U)(?:\s*,?\s*\(\s*1[89]\d\d\s*\))?"
@@ -90,9 +87,7 @@ def words(s: str) -> list[str]:
     return re.findall(r"\w+", nfc(s).lower())
 
 
-# ---------------------------------------------------------------- mốc tờ trong lớp chữ PDF
 
-# Chữ số OCR hay đọc lẫn trong mốc R1205: '20a' -> '90a', '13b' -> '15b', '30a' -> '50a'
 _DIGIT_CONFUSION = {"9": "2", "5": "3", "3": "5", "8": "3"}
 
 
@@ -123,7 +118,7 @@ def _marker_candidates(body: str) -> tuple[list[int], int | None]:
         nums.append(int(num_part))
         tail = re.match(r"(\d+)", rest)
         if tail and side is not None and "b" in rest:
-            nums.append(int(num_part + tail.group(1)))  # '2-3b' là '23b'
+            nums.append(int(num_part + tail.group(1)))
     return nums, side
 
 
@@ -162,16 +157,14 @@ def parse_markers(md: str) -> list[tuple[int, int]]:
             q += 1
             k = min(new_q)
             if last_head is not None and (not out or last_head > out[-1][0]):
-                # Dòng "QUYỂN THỨ…" mở quyển: phần trước mốc đầu tiên (niên hiệu, hoặc cả mặt 1a khi mất mốc) thuộc quyển mới
                 out.append((last_head, q * SHEET))
             prev = k
             out.append((pos, q * SHEET + k))
             continue
-        # kể cả các cách đọc lẫn chữ số; chỉ nhận mặt tờ rơi vào cửa sổ hợp lý, chọn mặt gần nhất
         ok = [2 * (n - 1) + s for v in nums for n in _digit_variants(str(v)) for s in sides
               if n >= 1 and prev < 2 * (n - 1) + s <= prev + 6]
         if q < 0 or not ok:
-            continue  # mốc đọc sai, không đoán
+            continue
         prev = min(ok)
         out.append((pos, q * SHEET + prev))
     return out
@@ -186,7 +179,6 @@ def anchor_positions(md: str, markers: list[tuple[int, int]], tokens: list[str])
     index: dict[tuple[str, ...], list[int]] = {}
     for i in range(len(tokens) - 3):
         index.setdefault(tuple(tokens[i:i + 4]), []).append(i)
-    # vị trí từ trong md của từng mốc (đếm dồn từng khúc giữa hai mốc, bỏ chữ trong mốc)
     md_words_before, acc, prev_pos = [], 0, 0
     for pos, _ in markers:
         acc += len(words(MARKER.sub(" ", md[prev_pos:pos])))
@@ -215,14 +207,13 @@ def anchor_positions(md: str, markers: list[tuple[int, int]], tokens: list[str])
     return out
 
 
-# ---------------------------------------------------------------- văn bản và câu
 
 def clean_viet(text: str) -> str:
     """Làm sạch nhẹ, chỉ sửa lỗi OCR hiển nhiên; KHÔNG dùng clean_dich_nghia của sắc phong vì hàm đó bỏ
     số đứng lẻ ('2 vệ', '6 tỉnh' là nội dung ở đây) và bỏ chuỗi in hoa (dòng niên hiệu là nội dung)."""
     s = nfc(text)
-    s = _FOOTNOTE_INDEX.sub(" ", s)  # chỉ mục chú thích '(1)'
-    s = re.sub(r"\(\s*\)\)?", " ", s)  # '())' do OCR chỉ mục chú thích
+    s = _FOOTNOTE_INDEX.sub(" ", s)
+    s = re.sub(r"\(\s*\)\)?", " ", s)
     s = re.sub(r"(?<=\w)[*+%](?=\W|$)", "", s)
     s = re.sub(r"[*+%#£$]", " ", s)
     s = re.sub(r"\((\d)\s(\d{3})\)", r"(\1\2)", s)
@@ -246,7 +237,7 @@ def split_sentences(text: str) -> list[str]:
             carry = ""
             if not s:
                 continue
-            if len(words(s)) < 3:  # mảnh quá ngắn ('1.', '3)', 'Vua nói.') gộp với câu sau
+            if len(words(s)) < 3:
                 carry = s
             else:
                 out.append(s)
@@ -262,7 +253,6 @@ def build_sentences(docs: dict[str, str]) -> list[VietSentence]:
     sents: list[VietSentence] = []
     for doc_id, raw in docs.items():
         parts = split_sentences(clean_viet(raw))
-        # Văn bản mở đầu bằng chữ thường ("ấy là phải."): phần đuôi câu của văn bản trước bị chia nhầm
         if parts and sents and parts[0][:1].islower():
             sents[-1].text += " " + parts.pop(0)
             sents[-1].note = f"Nối phần đầu {doc_id} (đuôi câu bị chia sang văn bản sau) vào câu này."
@@ -300,16 +290,14 @@ __all__ = ["VietSentence", "parse_markers", "anchor_positions", "build_sentences
            "sentence_tokens", "syllable_count", "words", "SHEET"]
 
 
-# ---------------------------------------------------------------- chia bản dịch thành văn bản (khi chưa có dich_nghia.txt)
 
 _RUNNING = re.compile(r"CH[ÍI]NH\W*Y[ẾE]U|^\W*\d{1,3}\W*$|^QUY[ỀỂÉÊE]N\b.{0,20}$|^Thi[êe]n\s+(?:th[ứu]|\d)", re.I)
 _QUYEN_LINE = re.compile(r"QUY[ỀỂÉÊÈE]N\s+(?:TH[ỨỪU]\s*)?\S{1,3}\s*$", re.I)
 _FOOTNOTE_LINE = re.compile(r"^\(\s*\d?\s*\)\)?")
 _UPPER_START = re.compile(r"^[\[(\"“«]?\s*[A-ZÀ-ỸĐ]")
-_BULLET = re.compile(r"^[$§_]\s*")  # dấu đầu điều (○) bị OCR thành '$' ở R1206: đầu một sự việc mới
+_BULLET = re.compile(r"^[$§_]\s*")
 _SENT_DONE = re.compile(r"[.!?»”)]\s*$")
 _SPEECH = re.compile(r"rằng\s*[.:]?\s*$|:\s*$")
-# Đoạn mở đầu bằng lời đáp/phê của vua hay phần tiếp của lời tâu thuộc cùng sự việc với đoạn trước
 _CONTINUATION = re.compile(
     r"^(?:Vua\s+(?:trả lời|bèn|phán|phún|phê|khen|y\b|cũng|giao|không|ra lời|nói|cho là|ưng|chuẩn|chuần|theo|"
     r"lại|nghe theo)|Dụ\b|Lại\b|Nay\b|Mỗi\b|Đình.thần|Các đình|Bàn\b|\d{1,2}\s*[.,)])", re.I)
@@ -326,7 +314,7 @@ def segment_translation(md: str) -> list[str]:
     pages = re.split(r"^## Trang \d+\s*$", md, flags=re.M)[1:]
     lines: list[str] = []
     page_of: list[int] = []
-    heads: list[int] = []  # vị trí (trong lines) của dòng "QUYỂN THỨ…"
+    heads: list[int] = []
     for pi, page in enumerate(pages):
         pl = [ln.strip() for ln in page.splitlines() if ln.strip()]
         for i, ln in enumerate(pl):
@@ -339,23 +327,21 @@ def segment_translation(md: str) -> list[str]:
                     page_of.append(pi)
                 continue
             if _FOOTNOTE_LINE.match(core) and i >= 0.5 * len(pl):
-                break  # chú thích cuối trang: bỏ đến hết trang
+                break
             if _RUNNING.search(core) and len(core) < 45 and not YEAR_HEADER.search(core):
                 continue
             letters = [c for c in core if c.isalpha()]
             if (len(core) < 60 and letters and sum(c.isupper() for c in letters) > 0.8 * len(letters)
                     and not YEAR_HEADER.search(core)):
-                continue  # tiêu đề thiên in hoa ("NÓI VỀ CHẾ BINH")
+                continue
             lines.append(ln)
             page_of.append(pi)
     marked = [i for i, ln in enumerate(lines) if MARKER.search(ln)]
     if not marked:
         return []
-    # Đầu: dòng "QUYỂN…" gần nhất trong 3 trang trước mốc đầu tiên (giữ được mặt 1a khi mất mốc 1a)
     fm = marked[0]
     near = [h for h in heads if h <= fm and page_of[min(h, len(lines) - 1)] >= page_of[fm] - 3]
     first = max(near) if near else fm
-    # Cuối: "ngừng bút" trong 3 trang sau mốc cuối cùng, nếu không thì hết trang có mốc cuối
     lm = marked[-1]
     stop = [i for i in range(lm, len(lines)) if page_of[i] <= page_of[lm] + 3 and "ngừng bút" in lines[i].lower()]
     last = stop[0] if stop else max(i for i in range(lm, len(lines)) if page_of[i] == page_of[lm])
@@ -382,13 +368,13 @@ def segment_translation(md: str) -> list[str]:
     out: list[str] = []
     for d in docs:
         text = re.sub(r"\s+", " ", " ".join(d)).strip()
-        text = re.sub(r"(\w)- (\w)", r"\1-\2", text)  # 'chỉnh- phạt' do ngắt dòng
+        text = re.sub(r"(\w)- (\w)", r"\1-\2", text)
         if not text:
             continue
         if out and len(words(text)) < 15 and not YEAR_HEADER.match(text):
-            out[-1] += " " + text  # mảnh quá ngắn không thành một sự việc riêng
+            out[-1] += " " + text
         else:
             out.append(text)
     while out and len(words(out[0])) < 8:
-        out.pop(0)  # tiêu đề sót ở đầu ("MỤC PHÁP-ĐỘ (thứ mười sáu)")
+        out.pop(0)
     return out

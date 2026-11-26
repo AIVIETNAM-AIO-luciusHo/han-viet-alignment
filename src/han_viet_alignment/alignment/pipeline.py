@@ -21,7 +21,6 @@ from .segment import split_dich_nghia, split_phien_am
 
 COLUMNS = ["sent_id", "doc_id", "doc_type", "han", "phien_am", "dich_nghia", "ghi_chu"]
 REVIEW_COLUMNS = ["sent_id", "co", "so_chu_han", "so_am_tiet", "khop_am", "chu_lech", "canh_bao"]
-# Mở đầu văn bản ('Sắc.', 'Chiếu.') hoặc công thức '… Hoàng đế chế/chiếu/sắc viết' (vd MAU.003)
 _DOC_TYPES = [(r"^s[ắa]c\b|\bs[ắa]c\s+vi[ếe]t\b", "sac_phong"),
               (r"^chi[ếe]u\b|\bchi[ếe]u\s+vi[ếe]t\b", "chieu_phong"),
               (r"^ch[ếe]\b|\bch[ếe]\s+vi[ếe]t\b", "che_phong")]
@@ -76,8 +75,6 @@ def _clean(doc: DocInput, readings: Readings, clean: bool) -> tuple[str, str, st
     han = clean_han(doc.han)
     pa = clean_phien_am(doc.phien_am, readings)
     pa_upper = clean_phien_am(doc.phien_am, readings, keep_upper=True)
-    # Chuỗi VIẾT HOA có thể là tiêu đề trang hoặc nội dung OCR in hoa ('HỘ QUỐC TÝ DÂN'): giữ khi
-    # nó khớp được thêm chữ Hán (bỏ nhầm nội dung làm lệch cả cặp phiên âm ↔ dịch nghĩa).
     if pa_upper != pa and han and readings is not None and \
             match_score(han, pa_upper, readings) > match_score(han, pa, readings):
         pa = pa_upper
@@ -132,7 +129,7 @@ def align_document(doc: DocInput, readings: Readings, default_doc_type: str = "s
                  "masked": mk, "notes": nt, "flags": fl}
                 for h, p, d, b, n, mk, nt, fl in zip(split.segments, row_pa, row_dn, beads, split.inserted,
                                                      split.masked, split.notes, split.flags)] if split else []
-    if not raw_rows and han:  # không có phiên âm: một dòng cho cả văn bản để không mất dữ liệu
+    if not raw_rows and han:
         raw_rows = [{"han": han, "pa": "", "dn": dn, "n_sent": 1, "inserted": 0,
                      "masked": 0, "notes": [], "flags": []}]
     rows_in = _merge_empty_rows(raw_rows)
@@ -140,16 +137,13 @@ def align_document(doc: DocInput, readings: Readings, default_doc_type: str = "s
     rows, review = [], []
     for k, r in enumerate(rows_in, 1):
         sid = f"{doc.doc_id}.{k}"
-        # ghi_chu theo mục 3: giải thích chỗ có □ và [...]
         notes = []
         n_box = r["han"].count(MISSING)
         if r["inserted"]:
-            notes.append(f"{r['inserted']} chữ Hán OCR chưa nhận được, ghi □; cần đối chiếu ảnh gốc để nhập lại.")
+            notes.append(f"{r['inserted']} chữ Hán OCR chưa nhận được, ghi □.")
         pre_box = n_box - r["inserted"] - r["masked"]
         if pre_box > 0:
-            # □ có sẵn trong đầu vào: không biết do OCR bỏ sót hay nguồn khuyết -> người xác định theo ảnh
-            notes.append(f"{pre_box} chữ Hán không đọc được (OCR hoặc nguồn khuyết), ghi □; "
-                         "cần đối chiếu ảnh gốc.")
+            notes.append(f"{pre_box} chữ Hán không đọc được (OCR hoặc nguồn khuyết), ghi □.")
         notes.extend(r["notes"])
         if DN_MISSING in r["dn"]:
             notes.append("Bản dịch khuyết đoạn tương ứng, ghi [...].")
@@ -174,8 +168,6 @@ def align_document(doc: DocInput, readings: Readings, default_doc_type: str = "s
             warns.append("THIEU_DICH")
         simp = simplified_in(r["han"])
         if simp:
-            # Mục 3: chữ giản thể do OCR sinh ra phải sửa về đúng chữ gốc. Script chấm vẫn tính khớp (từ điển
-            # có giản thể) nên phải gắn cờ riêng; không tự đổi vì một chữ giản có thể ứng với nhiều chữ phồn.
             warns.append(f"GIAN_THE({','.join(simp)})")
         if no_han:
             warns.append("THIEU_HAN")

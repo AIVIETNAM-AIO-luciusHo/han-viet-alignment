@@ -15,16 +15,15 @@ from dataclasses import dataclass, field
 from ..common.text import is_han
 
 PAGE_HEADER = re.compile(r"^## Trang (\d+)\s*$", re.M)
-SHEET = 200  # mã mặt tờ toàn cục = chỉ_số_quyển * SHEET + mặt_trong_quyển
-FULL_COLUMN = 17  # cột thân văn 19 chữ, cột thụt 17 chữ; ngắn hơn là hết đoạn
-EDGE_HEAD, EDGE_TAIL = 3, 4  # số dòng đầu/cuối trang có thể là chữ lề
+SHEET = 200
+FULL_COLUMN = 17
+EDGE_HEAD, EDGE_TAIL = 3, 4
 
 _CN = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 QUYEN_START = re.compile(r"^明命政要卷之([一二三四五六七八九十]+)$")
 QUYEN_END = re.compile(r"卷之.{0,5}止$")
 CHAPTER_TITLE = re.compile(r"^(\S{2,6})第[一二三四五六七八九十]+$")
 YEAR_HEADER = re.compile(r"^明命[元一二三四五六七八九十]+年$")
-# Chữ của "明命政要" và các cách OCR đọc sai ở lề: 月命文要, 曰名正耳, 曰右正焉, 日名正馬…
 MARGIN_CHARS = set("明命政要正耳焉豆名右月曰日文改馬矣辰足五巧合仁介石")
 NUMERALS = set("一二三四五六七八九十百")
 
@@ -48,7 +47,7 @@ class HanUnit:
     folio_start: int
     folio_end: int
     pages: tuple[int, int]
-    lines: list[str] = field(default_factory=list)  # các cột chữ; văn bản mới luôn bắt đầu ở đầu cột
+    lines: list[str] = field(default_factory=list)
 
     @property
     def year(self) -> int | None:
@@ -63,8 +62,8 @@ class HanUnit:
 @dataclass
 class HanBook:
     units: list[HanUnit]
-    dropped: list[tuple[int, str, str]] = field(default_factory=list)  # (trang, dòng OCR, lý do)
-    quyen_numbers: dict[int, int] = field(default_factory=dict)  # chỉ số quyển -> số quyển (14, 15…)
+    dropped: list[tuple[int, str, str]] = field(default_factory=list)
+    quyen_numbers: dict[int, int] = field(default_factory=dict)
     page_folio: dict[int, int] = field(default_factory=dict)
 
 
@@ -160,7 +159,7 @@ def load_han_book(md: str) -> HanBook:
             side = 0
             book.quyen_numbers[q] = num
         elif q < 0:
-            continue  # trang trước quyển đầu (bìa, lời dẫn)
+            continue
         else:
             side += 1
         g = q * SHEET + side

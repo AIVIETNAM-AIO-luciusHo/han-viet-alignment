@@ -14,15 +14,17 @@ import re
 from ..common.dictionary import Readings
 from ..common.text import DN_MISSING, HAN_PUNCT, MISSING, is_han, nfc
 
-# Tiếng Việt không có âm tiết chỉ gồm một phụ âm
 _LONE_CONSONANT = set("bcdđfghjklmnpqrstvwxzBCDĐFGHJKLMNPQRSTVWXZ")
 _VOWEL_START = re.compile(r"^[aăâeêioôơuưyáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]", re.I)
 _UPPER_WORD = r"[A-ZÀ-ỸĐ]{2,}"
 _RUNNING_HEADER = re.compile(rf"(?:\b{_UPPER_WORD}\b[\s,.\-–:]*){{3,}}")
 _BOX_VARIANTS = re.compile(r"[■-▩▭-▰◼〓�]")
 _FOOTNOTE_INDEX = re.compile(r"\[\d{1,2}\]|\((?!1[5-9]\d\d|20\d\d)\d{1,2}\)")
-# Số đứng sau các từ này là số thật của bản dịch (ngày, tháng, năm, thứ...), phải giữ
-_NUMBER_CONTEXT = {"ngày", "tháng", "năm", "thứ", "mồng", "mùng", "số", "lần", "đội", "khoảng", "hơn", "gần"}
+_PLACE_NOTE = re.compile(
+    r"[\s\-–?%*\]]*\b(?:Nay\s+(?:là|lá|thuộc)|(?:Muy|May|Vay/à|Ncy|Nuy|Nav|MMuy)(?:\s+(?:là|lá|thuộc))?)\s+"
+    r"(?:thôn|thân|xã|phường|làng|xóm|khu|thị\s+trấn)\b.*$", re.S)
+_NUMBER_CONTEXT = {"ngày", "tháng", "năm", "thứ", "mồng", "mùng", "số", "lần", "đội", "khoảng", "hơn", "gần",
+                   "tròn", "thọ"}
 
 
 def _space_punct(s: str) -> str:
@@ -91,7 +93,6 @@ def clean_phien_am(text: str, readings: Readings | None = None, keep_upper: bool
         s = _drop_running_headers(s)
     s = s.replace("*", " ").replace("+", " ").replace("%", " ")
     s = _FOOTNOTE_INDEX.sub(" ", s)
-    # Phiên âm không chứa chữ số (năm tháng viết bằng chữ): token có chữ số là rác OCR
     s = re.sub(r"\S*\d\S*", " ", s)
     s = re.sub(r"[^\w\s□,.;:!?()\"'“”‘’\-–]", " ", s)
     tokens = _fix_lone_letters(s.split())
@@ -99,30 +100,51 @@ def clean_phien_am(text: str, readings: Readings | None = None, keep_upper: bool
     return _space_punct(" ".join(tokens))
 
 
+_NOTE_TAIL_MAX = 150
+_NEXT_SENTENCE = re.compile(r"[.!?]\s+(?=[A-ZÀ-ỸĐ])")
+
+
+def strip_place_notes(s: str) -> str:
+    """Bỏ chú thích địa danh hiện đại ('Nay là thôn …') khỏi dịch nghĩa.
+
+    Chú thích nằm cuối trang nên đuôi ngắn thì bỏ hết; đuôi dài (chú thích giữa văn bản) chỉ bỏ đến hết câu để
+    không mất phần dịch phía sau.
+    """
+    out, pos = [], 0
+    while True:
+        m = _PLACE_NOTE.search(s, pos)
+        if not m:
+            break
+        out.append(s[pos:m.start()])
+        tail = s[m.start():]
+        if len(tail) <= _NOTE_TAIL_MAX:
+            pos = len(s)
+            break
+        nxt = _NEXT_SENTENCE.search(tail)
+        pos = m.start() + nxt.end() if nxt else len(s)
+        out.append(" ")
+    out.append(s[pos:])
+    return re.sub(r"\s+", " ", "".join(out)).strip()
+
+
 def clean_dich_nghia(text: str, readings: Readings | None = None) -> str:
     if not text or text.strip() in (DN_MISSING, "[Sách gốc không có bản dịch]"):
         return DN_MISSING
     s = nfc(text)
     s = _drop_running_headers(s)
+    s = strip_place_notes(s)
     s = _FOOTNOTE_INDEX.sub(" ", s)
-    # Chỉ mục chú thích dính chữ: 'Động*', 'Động%', 'Hưng Yên+'
     s = re.sub(r"(?<=\w)[*+%](?=\W|$)", "", s)
     s = re.sub(r"[*+%]", " ", s)
-    # 'thayl', 'thay1', 'thay]' -> 'thay!' ở cuối câu kết sắc phong
     s = re.sub(r"\b(thay)[l1I|\]](?=\s|$)", r"\1!", s)
     s = re.sub(r"\bK[ií]nh\s+c[aâầẩấậẫ]n\s+thay\b!?", "Kính cẩn thay!", s)
-    # Năm dương lịch bị OCR tách: '(1 887)' -> '(1887)'
     s = re.sub(r"\((\d)\s(\d{3})\)", r"(\1\2)", s)
-    # Rác OCR dính ngoặc kép + chữ số ('"2,2', '(1,000)"'): bản dịch không viết kiểu này
     s = re.sub(r"\(\d{1,3},\d{3}\)\"?", " ", s)
     s = re.sub(r"\"\d+(?:,\d+)*", " ", s)
-    # Năm mất ngoặc mở: '31, 1878),' -> '31, (1878),'
     s = re.sub(r"(?<![(\d])\b(1[5-9]\d\d|20\d\d)\)", r"(\1)", s)
-    # Số đứng lẻ không thuộc ngày/tháng/năm/thứ... là số trang hoặc chỉ mục chú thích
     tokens = s.split()
     kept: list[str] = []
     for i, t in enumerate(tokens):
-        # Số lẻ (kể cả năm 4 chữ số ngoài ngoặc, vd '1981' giữa câu) không theo sau ngày/tháng/năm... là rác
         if re.fullmatch(r"\d{1,4}", t):
             prev = tokens[i - 1].lower().strip(",.;:") if i else ""
             if prev not in _NUMBER_CONTEXT:

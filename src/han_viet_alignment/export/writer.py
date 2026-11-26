@@ -34,7 +34,7 @@ def write_xlsx(path: Path, rows: list[dict], columns: list[str], sheet: str = "D
     for row in ws.iter_rows():
         for cell in row:
             if cell.value is not None:
-                cell.data_type = TYPE_STRING  # chặn Excel hiểu '=…' là công thức hay chuỗi số là số
+                cell.data_type = TYPE_STRING
                 cell.number_format = "@"
     widths = {"sent_id": 14, "doc_id": 11, "doc_type": 12, "han": 40, "phien_am": 60, "dich_nghia": 60, "ghi_chu": 40}
     for idx, c in enumerate(columns, 1):

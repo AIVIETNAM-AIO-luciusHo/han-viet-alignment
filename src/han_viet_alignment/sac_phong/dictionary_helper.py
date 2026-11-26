@@ -33,9 +33,9 @@ class SinoNomDictionary:
             project_root = Path.cwd()
 
         self.dict_path = Path(dict_path) if dict_path else project_root / "guideline" / "dict" / "QuocNgu_SinoNom_TongHop3.xlsx"
-        self.han2qn = {}      # char -> set of syl_keys
-        self.qn2han = {}      # syl_key -> set of chars
-        self.raw_mappings = {} # char -> set of original qn strings
+        self.han2qn = {}
+        self.qn2han = {}
+        self.raw_mappings = {}
         self._load()
 
     def _load(self):

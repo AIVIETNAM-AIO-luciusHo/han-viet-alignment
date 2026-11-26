@@ -57,7 +57,7 @@ def load_docs(book_dir: Path, han_source: str, readings=None) -> tuple[list[DocI
     dn = read_blocks(text_dir / "dich_nghia.txt")
     raw_dir = book_dir / "02_ocr_tho" / "han"
     notes, docs = [], []
-    order = list(dict.fromkeys([*pa, *han, *dn]))  # thứ tự văn bản theo sách
+    order = list(dict.fromkeys([*pa, *han, *dn]))
     for doc_id in order:
         h = han.get(doc_id, "")
         raw_file = raw_dir / f"{doc_id}.txt"
@@ -67,8 +67,6 @@ def load_docs(book_dir: Path, han_source: str, readings=None) -> tuple[list[DocI
         elif han_source == "auto" and raw_file.exists():
             raw = raw_file.read_text(encoding="utf-8")
             if readings is not None and pa.get(doc_id):
-                # Có phiên âm: chọn nguồn khớp âm nhiều chữ hơn (độ khớp âm tính trên kết quả cuối).
-                # So cả khi han.txt nhiều □: □ không được tính điểm, nên so vẫn công bằng.
                 p_clean = clean_phien_am(pa[doc_id], readings)
                 s_txt = match_score(clean_han(h), p_clean, readings)
                 s_raw = match_score(clean_han(raw), p_clean, readings)
@@ -76,7 +74,7 @@ def load_docs(book_dir: Path, han_source: str, readings=None) -> tuple[list[DocI
                     notes.append(f"{doc_id}: dùng OCR thô {raw_file.relative_to(book_dir)} "
                                  f"(khớp âm {s_raw} chữ, han.txt {s_txt} chữ)")
                     h = raw
-            elif broken:  # không có phiên âm để so: chỉ thay khi han.txt rỗng/toàn □
+            elif broken:
                 notes.append(f"{doc_id}: han.txt rỗng/toàn □ -> dùng OCR thô {raw_file.relative_to(book_dir)}")
                 h = raw
         docs.append(DocInput(doc_id, h, pa.get(doc_id, ""), dn.get(doc_id, "")))
@@ -93,7 +91,7 @@ def read_edited(path: Path) -> list[dict]:
     if missing:
         sys.exit(f"[!] {path} thiếu cột {missing}")
     rows = [{c: clean_cell(str(r[c])) for c in COLUMNS} for _, r in df.iterrows()]
-    return [r for r in rows if any(r.values())]  # bỏ dòng trống do sửa tay
+    return [r for r in rows if any(r.values())]
 
 
 def run_checker(tsv: Path, xlsx: Path, dict_path: Path) -> int:
@@ -132,11 +130,11 @@ def tach_menh_de(tsv: Path, xlsx: Path, ma: str, readings) -> list[dict]:
         split.extend(split_row(r, readings))
     new_rows, mapping = renumber(split)
 
-    if review_json.exists():  # dòng con thừa hưởng trạng thái duyệt của dòng cha
+    if review_json.exists():
         old = json.loads(review_json.read_text(encoding="utf-8"))
         new = {nid: v for sid, v in old.items() for nid in mapping.get(sid, [sid])}
         review_json.write_text(json.dumps(new, ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
-    if review_tsv.exists():  # cảnh báo thừa hưởng từ dòng cha, số liệu chữ–âm tính lại
+    if review_tsv.exists():
         with review_tsv.open(encoding="utf-8") as f:
             old_rv = {r["sent_id"]: r for r in csv.DictReader(f, delimiter="	", quoting=csv.QUOTE_NONE)}
         by_new = {nid: sid for sid, ids in mapping.items() for nid in ids}
@@ -239,7 +237,6 @@ def main() -> None:
     write_tsv(review_path, review, REVIEW_COLUMNS)
     print(f"\n[✓] {tsv}\n[✓] {xlsx}\n[✓] {review_path} (danh sách dòng cần người hiệu đính)")
     print_summary(summarize(rows, readings))
-    # Tỷ lệ lỗi (HD mục 8) tính trên cặp hợp lệ: liệt kê cặp hợp lệ có dấu hiệu dóng lệch để rà trước
     risky = [rv["sent_id"] for r, rv in zip(rows, review)
              if MISSING not in r["han"] + r["phien_am"] and "[...]" not in r["dich_nghia"]
              and any(k in rv["canh_bao"] for k in ("LECH_", "THIEU_TEN", "GOP_NHIEU_CAU", "KHOP_AM", "GIAN_THE"))]

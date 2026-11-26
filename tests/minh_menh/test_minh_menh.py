@@ -57,13 +57,12 @@ class TestHanOcr(unittest.TestCase):
     def test_folios_margins_and_units(self):
         book = load_han_book(HAN_MD)
         self.assertEqual(book.quyen_numbers, {0: 14})
-        self.assertEqual(book.page_folio, {1: 0, 2: 1})  # trang đầu quyển là 1a, trang sau là 1b
+        self.assertEqual(book.page_folio, {1: 0, 2: 1})
         texts = [u.text for u in book.units]
-        # Bỏ tiêu đề quyển, tên thiên, chữ lề (月命文要, 曰名正耳), rác OCR (光YTE, 1b)
         self.assertEqual(texts, ["明命元年", "命諸軍操演戎陣",
                                  "帝謂侍臣曰朝廷養兵無所靳費每有興造輒加賞刻減及藉事游移者各從重論", "明命二年"])
         self.assertEqual(book.units[0].year, 1820)
-        self.assertEqual((book.units[2].folio_start, book.units[2].folio_end), (0, 1))  # đoạn vắt qua hai mặt
+        self.assertEqual((book.units[2].folio_start, book.units[2].folio_end), (0, 1))
         reasons = {r for _, _, r in book.dropped}
         self.assertTrue({"tieu_de_quyen", "ten_thien", "le_trang"} <= reasons)
 
@@ -72,7 +71,6 @@ class TestVietText(unittest.TestCase):
     def test_markers_repair_ocr_noise(self):
         md = "[tờ 1-A] a [tờ 1-b] b [tờ 2-a] c [tờ 2-5b] d [tờ 3-4] e [tờ 6.8] f [tờ 1ì-a] g [tờ 2-3b]"
         got = [g for _, g in parse_markers(md)]
-        # 2-5b -> 2b, 3-4 -> 3a, '6.8' -> 6a (nhảy mặt hợp lệ), '1ì-a' và '2-3b' sai thứ tự -> bỏ
         self.assertEqual(got, [0, 1, 2, 3, 4, 10])
 
     def test_new_quyen_uses_header_when_1a_missing(self):
@@ -107,14 +105,13 @@ class TestVietText(unittest.TestCase):
         self.assertEqual([(s.folio_start, s.folio_end) for s in sents], [(0, 0), (0, 1), (2, 2)])
 
     def test_bare_markers_and_digit_confusion(self):
-        # R1205: mốc không có chữ 'tờ', OCR đọc '2' thành '9', '3' thành '5'
         got = [g for _, g in parse_markers("[1b] x [9a] y (9b] z [5a} w [3b] [4b]")]
         self.assertEqual(got, [1, 2, 3, 4, 5, 7])
 
     def test_lost_digit_is_not_new_quyen(self):
         md = " ".join(f"[tờ {n}a] y [tờ {n}b] y" for n in range(1, 11)) + " [tờ 1b] z [tờ 12a] z"
         got = [g for _, g in parse_markers(md)]
-        self.assertTrue(all(g < SHEET for g in got))  # '[tờ 1b]' là '11b' mất chữ số, không sang quyển mới
+        self.assertTrue(all(g < SHEET for g in got))
 
     def test_year_header_without_parentheses(self):
         self.assertEqual(VietSentence("MINH-MỆNH NĂM THỨ MƯỜI", "d").year, 1829)
@@ -144,7 +141,7 @@ Mục lục
         docs = segment_translation(md)
         self.assertEqual(len(docs), 2)
         self.assertTrue(docs[0].startswith("NĂM MINH-MỆNH THỨ HAI (1821) Quan Bộ Binh"))
-        self.assertIn("Vua phán rằng: Cho làm", docs[0])  # lời đáp thuộc cùng sự việc
+        self.assertIn("Vua phán rằng: Cho làm", docs[0])
         self.assertTrue(docs[1].startswith("Bộ Hộ tâu xin"))
         self.assertNotIn("chú thích", " ".join(docs))
         self.assertNotIn("Mục lục", " ".join(docs))
@@ -182,10 +179,9 @@ class TestAlign(unittest.TestCase):
         self.assertIn("TIN_CAY_THAP:TY_LE", low_confidence(10, 60, 1.4, 1, 1, 3, 0, False, []))
         self.assertIn("TIN_CAY_THAP:LECH_TO", low_confidence(40, 55, 1.4, 1, 1, 3, 1, False, []))
         self.assertIn("TIN_CAY_THAP:CAT_TUY_Y", low_confidence(40, 55, 1.4, 1, 1, 0, 0, False, [], cut_score=0))
-        self.assertEqual(low_confidence(4, 9, 1.4, 1, 1, 0, 2, True, []), [])  # dòng niên hiệu luôn giữ
+        self.assertEqual(low_confidence(4, 9, 1.4, 1, 1, 0, 2, True, []), [])
 
     def test_global_cut_crosses_ocr_paragraphs(self):
-        # Đoạn OCR ngắt giữa câu (…命兵 | 部改正兵籍): dóng cấp chữ vẫn cắt đúng chỗ đổi câu, không theo đoạn
         units = [HanUnit("明命元年", 0, 0, (1, 1), ["明命元年"]),
                  HanUnit("帝御乾元殿觀之命兵", 0, 0, (1, 1), ["帝御乾元殿觀之命兵"]),
                  HanUnit("部改正兵籍", 0, 0, (1, 1), ["部改正兵籍"])]
@@ -199,7 +195,6 @@ class TestAlign(unittest.TestCase):
         self.assertEqual(len(margins), len(cuts))
 
     def test_global_cut_matches_sentence_edges(self):
-        # Theo độ dài thì cắt sớm (câu 1 ngắn); khớp mép "… tâu lên" ↔ 以聞, "Vua ưng cho" ↔ 上許 kéo về đúng chỗ
         text = "臣奏請增設防兵以聞上許之命廷議"
         st = build_stream([HanUnit(text, 0, 0, (1, 1), [text])])
         sents = [VietSentence("Quan xin thêm lính, tâu lên.", "D.001", 0, 0),
@@ -212,7 +207,6 @@ class TestAlign(unittest.TestCase):
 
     def test_group_merges_uncertain_and_empty(self):
         cuts = [0, 5, 9, 9, 20]
-        # biên độ thấp ở cắt 2 -> gộp câu 1–2; câu 2 có đoạn Hán rỗng (cuts[2] == cuts[3]) -> gộp với câu sau
         self.assertEqual(group_sentences(cuts, [9, 3.0, 0.2, 3.0, 9], 1.0), [(0, 1), (1, 3), (3, 4)])
         self.assertEqual(group_sentences(cuts, [9, 3.0, 3.0, 3.0, 9], 1.0), [(0, 1), (1, 2), (2, 4)])
 

@@ -38,7 +38,6 @@ class HanAutoCorrector:
     _instance = None
 
     def __init__(self, dict_path: str = None, sim_path: str = None):
-        # Tự động định vị project root (chứa guideline/ hoặc .git)
         cur = Path(__file__).resolve()
         project_root = None
         for p in [cur] + list(cur.parents):
@@ -60,7 +59,6 @@ class HanAutoCorrector:
 
     def _load_data(self):
         print("[*] Đang nạp từ điển Hán Nôm và ma trận chữ tương tự...")
-        # 1. Nạp QuocNgu_SinoNom_TongHop3
         if not self.dict_path.exists():
             print(f"[!] KHÔNG THẤY TỪ ĐIỂN {self.dict_path} — tắt Auto-Correction, giữ nguyên chữ Hán OCR thô.")
         else:
@@ -74,7 +72,6 @@ class HanAutoCorrector:
                     if ch not in self.qn_to_han[k]:
                         self.qn_to_han[k].append(ch)
 
-        # 2. Nạp SinoNom_Similar_Dic_v2
         if self.sim_path.exists():
             df_sim = pd.read_excel(self.sim_path)
             for _, r in df_sim.iterrows():
@@ -86,7 +83,6 @@ class HanAutoCorrector:
                     except:
                         self.similar_map[c] = []
 
-        # 3. Nạp Domain Priors (từ vựng sắc phong triều Nguyễn kinh điển)
         root = Path(__file__).parent.parent
         mau_path = root / "guideline" / "mau_du_lieu" / "MAU_parallel.tsv"
         if mau_path.exists():
@@ -129,7 +125,6 @@ class HanAutoCorrector:
         người hiệu đính sửa theo ảnh; chữ OCR bỏ sót -> ghi □ ('missing') và ghi chú khi dóng hàng.
         """
         if not phien_am or not self.han_readings:
-            # Không có từ điển thì mọi âm đều không tra được -> sẽ thay toàn bộ bằng □; giữ nguyên OCR thô
             return raw_han, []
 
         han_chars = [c for c in raw_han if is_han(c)]
@@ -144,12 +139,10 @@ class HanAutoCorrector:
         backtrack = [[(0, 0, "") for _ in range(N + 1)] for _ in range(M + 1)]
         dp[0][0] = 0
 
-        # Phạt bỏ rác OCR thừa
         for j in range(1, N + 1):
             dp[0][j] = dp[0][j - 1] - 3
             backtrack[0][j] = (0, j - 1, "del_ocr")
 
-        # Phạt chèn chữ thiếu từ phiên âm
         for i in range(1, M + 1):
             dp[i][0] = dp[i - 1][0] - 5
             backtrack[i][0] = (i - 1, 0, "ins_pa")
@@ -161,19 +154,16 @@ class HanAutoCorrector:
             for j in range(1, N + 1):
                 ch = han_chars[j - 1]
 
-                # Trường hợp 1: Khớp âm chính xác
                 if sk in self.han_readings.get(ch, ()):
                     score = dp[i - 1][j - 1] + 12
                     action = ("match", ch)
                 else:
-                    # Trường hợp 2: Chữ OCR có hình dạng tương tự (Similar Lookalike)
                     sim_cands = [sc for sc in self.similar_map.get(ch, []) if sk in self.han_readings.get(sc, ())]
                     if sim_cands:
                         sim_match = max(sim_cands, key=lambda c: self.freq_weights.get(c, 0))
                         score = dp[i - 1][j - 1] + 9
                         action = ("similar", sim_match)
                     else:
-                        # Trường hợp 3: chữ OCR không khớp âm, không có chữ giống hình -> giữ nguyên chữ OCR
                         score = dp[i - 1][j - 1] - 4
                         action = ("keep_ocr", ch)
 
@@ -181,19 +171,16 @@ class HanAutoCorrector:
                     dp[i][j] = score
                     backtrack[i][j] = (i - 1, j - 1, action)
 
-                # Bỏ qua chữ rác từ OCR
                 del_score = dp[i][j - 1] - 3
                 if del_score > dp[i][j]:
                     dp[i][j] = del_score
                     backtrack[i][j] = (i, j - 1, "del_ocr")
 
-                # Chữ bị OCR bỏ sót: ghi □ (mục 3: mỗi chữ thiếu một □), không đoán chữ theo âm
                 ins_score = dp[i - 1][j] - 5
                 if ins_score > dp[i][j]:
                     dp[i][j] = ins_score
                     backtrack[i][j] = (i - 1, j, ("missing", "□"))
 
-        # Truy vết kết quả
         curr_i, curr_j = M, N
         aligned = []
         while curr_i > 0 or curr_j > 0:
@@ -206,7 +193,7 @@ class HanAutoCorrector:
                     "char": act[1],
                     "action": act[0]
                 })
-            elif act == "ins_pa":  # cột 0: không còn chữ OCR nào
+            elif act == "ins_pa":
                 aligned.append({
                     "syllable": pa_syls[curr_i - 1],
                     "char": "□",

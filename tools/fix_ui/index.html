@@ -23,7 +23,6 @@ main{flex:1;display:grid;grid-template-columns:300px minmax(380px,1fr) minmax(38
 section{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
 section>h3{margin:0;padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center}
 .scroll{overflow:auto;flex:1;padding:10px 12px}
-/* col 1 */
 .sylbar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
 .sylbar input{flex:1;min-width:0}
 .cur{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;margin-bottom:10px;background:var(--panel)}
@@ -43,7 +42,6 @@ table.cmp td.h{font-size:20px;width:30px}
 table.cmp tr.bad td{background:var(--accent-bg)}
 .rd{display:inline-block;margin:1px 2px;padding:0 5px;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:12px}
 .rd:hover{border-color:var(--accent)}
-/* col 2 */
 .sent{margin-bottom:14px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 .sent.active{border-color:var(--accent)}
 .sent.done{border-left:4px solid var(--ok)}
@@ -69,7 +67,6 @@ textarea.dirty{border-color:var(--warn)}
 .chips{display:flex;flex-wrap:wrap;gap:2px;margin:2px 0}
 .chip{font-size:11px;padding:0 4px;border-radius:3px;color:var(--muted)}
 .chip.bad{background:var(--accent-bg);color:var(--accent);font-weight:600}
-/* col 3 */
 #view{position:relative;flex:1;overflow:hidden;background:#000;cursor:grab}
 #view.drag{cursor:grabbing}
 #stage{position:absolute;top:0;left:0;transform-origin:0 0}
@@ -119,7 +116,6 @@ kbd{border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
 const $ = s => document.querySelector(s);
 const isHan = ch => { const c = ch.codePointAt(0); return (c>=0x3400&&c<=0x4DBF)||(c>=0x4E00&&c<=0x9FFF)||(c>=0xF900&&c<=0xFAFF)||(c>=0x20000&&c<=0x3FFFF); };
 const sylKey = s => { let t='0', b=''; for (const c of s.toLowerCase().trim().normalize('NFD')) { const m={'̀':'2','́':'1','̃':'4','̉':'3','̣':'5'}[c]; if (m) t=m; else b+=c; } return b.normalize('NFC')+t; };
-// âm tiết = chuỗi chữ/số/□ (giống syllables() bên Python: bỏ dấu câu rồi tách khoảng trắng)
 const SYL_RE = /[\p{L}\p{M}\p{N}_□]+/gu;
 const sylls = t => t.normalize('NFC').match(SYL_RE) || [];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -136,7 +132,6 @@ const charCache = {};
 async function charInfo(ch){ if(!charCache[ch]) charCache[ch]=await api('/api/char?ch='+encodeURIComponent(ch)); return charCache[ch]; }
 const hanUnits = han => [...han].filter(c=>isHan(c)||c==='□');
 
-// ---------- mode ----------
 const HELP = {
   pa_dn: '<kbd>Ctrl</kbd>+<kbd>Enter</kbd> lưu + duyệt + câu sau · <kbd>Alt</kbd>+<kbd>↑↓</kbd> đổi câu · <kbd>Esc</kbd> hoàn tác ô',
   han: '<kbd>←</kbd><kbd>→</kbd> di chuyển · <kbd>1</kbd>–<kbd>9</kbd> chọn · <kbd>⌫</kbd> đặt □ · <kbd>Del</kbd> xóa ô · <kbd>[</kbd><kbd>]</kbd> lệch âm · <kbd>V</kbd> duyệt câu · ô phiên âm: <kbd>Enter</kbd> lưu, <kbd>Esc</kbd> hoàn tác',
@@ -155,7 +150,6 @@ function setMode(m){
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 
-// ---------- docs ----------
 const docTodo = d => S.mode==='han' ? d.missing>0 : d.done.pa_dn < d.sents;
 function renderDocSel() {
   const only = $('#onlyTodo').checked, cur = S.doc && S.doc.doc_id;
@@ -203,9 +197,8 @@ async function toggleReview(si){
 const vbtn = (s,si) => `<button class="vbtn ${s.review[S.mode]?'on':''}" data-rev="${si}">${s.review[S.mode]?'✓ đã duyệt':'Duyệt'}</button>`;
 $('#col2').addEventListener('click', e=>{ const b=e.target.closest('[data-rev]'); if(b){ e.stopPropagation(); toggleReview(+b.dataset.rev); } }, true);
 
-// ================= MODE 1: phiên âm & dịch nghĩa =================
 const firstTodo = () => Math.max(0, S.doc.sents.findIndex(s=>!s.review.pa_dn));
-function badSyls(s){ // vị trí âm không khớp chữ Hán cùng vị trí
+function badSyls(s){
   const u=hanUnits(s.han), y=sylls(s.phien_am), bad=new Set();
   u.forEach((ch,k)=>{ if(ch==='□'||!y[k]) return; const info=charCache[ch]; if(info && !info.syls.some(r=>sylKey(r)===sylKey(y[k]))) bad.add(k); });
   return bad;
@@ -261,14 +254,13 @@ async function saveField(t){
   Object.assign(s, r.sent); t.value=s[f]; t.classList.remove('dirty');
   if (S.mode==='han' && f==='phien_am') {
     delete S.draftPa[si]; updateCellSyls(si);
-    if (S.sel && S.sel.si===si) loadCands(sylOf(si, S.sel.k)); // âm mới -> gợi ý chữ mới
+    if (S.sel && S.sel.si===si) loadCands(sylOf(si, S.sel.k));
   }
   toast(`${s.sent_id}: đã lưu ${f==='phien_am'?'phiên âm':'dịch nghĩa'}`);
   return true;
 }
 async function saveCard(si){ for (const t of document.querySelectorAll(`#sent${si} textarea`)) if(!(await saveField(t))) return false; return true; }
 
-// cột 1 (mode 1): bảng chữ Hán ↔ âm, click cách đọc để thay âm trong phiên âm
 function renderCmp(paOverride){
   if (S.mode!=='pa_dn' || !S.doc) return;
   const si=S.act, s=S.doc.sents[si]; if(!s) return;
@@ -286,7 +278,7 @@ function renderCmp(paOverride){
     <div class="sub">Bấm một cách đọc để thay âm tương ứng trong ô phiên âm.</div>
     <table class="cmp"><tbody>${rows}</tbody></table>`;
 }
-$('#col1').addEventListener('mousedown', e=>{ if(e.target.closest('.rd')) e.preventDefault(); }); // giữ focus ở ô phiên âm
+$('#col1').addEventListener('mousedown', e=>{ if(e.target.closest('.rd')) e.preventDefault(); });
 $('#col1').addEventListener('click', e=>{
   const r=e.target.closest('.rd'); if(!r||S.mode!=='pa_dn') return;
   const ta=document.querySelector(`#sent${S.act} textarea[data-f="phien_am"]`); if(!ta) return;
@@ -298,8 +290,6 @@ $('#col1').addEventListener('click', e=>{
   ta.dispatchEvent(new Event('input',{bubbles:true})); ta.focus();
 });
 
-// ================= MODE 2: chữ Hán =================
-// âm của câu: bản đang gõ dở trong ô phiên âm (nếu có) hoặc bản đã lưu
 const sylsOf = si => si in S.draftPa ? sylls(S.draftPa[si]) : S.doc.sents[si].syls;
 function sylOf(si, k){ return sylsOf(si)[k+(S.shift[si]||0)]||''; }
 function ocrHint(si, k){ const s=S.doc.sents[si], syl=sylOf(si,k); const h=s.ocr_hints.find(([c,y])=>sylKey(y)===sylKey(syl)); return h?h[0]:''; }
@@ -329,7 +319,6 @@ function cntHtml(si){
     <button class="vbtn" data-add="${si}" title="Chèn 1 ô □ sau ô đang chọn (chưa chọn ô nào trong câu thì thêm cuối câu)">+□</button>
     ${ny>nu?`<button class="vbtn" data-fill="${si}" title="Thêm ${ny-nu} ô □ vào cuối câu cho bằng số âm">Bù ${ny-nu} □</button>`:''}`;
 }
-// chèn n ô □ vào câu si tại vị trí ký tự idx (mặc định: sau ô đang chọn, hoặc cuối câu)
 async function insertMissing(si, n, atEnd){
   const sent=S.doc.sents[si], card=$('#sent'+si);
   const ta=card && card.querySelector('textarea.dirty'); if(ta && !(await saveField(ta))) return;
@@ -338,11 +327,10 @@ async function insertMissing(si, n, atEnd){
   const r=await api('/api/insert',{sent_id:sent.sent_id, idx, n});
   if(!r.ok) return toast('Lỗi: '+r.error);
   Object.assign(sent, r.sent);
-  // dời chỉ số các ô đã sửa (tô xanh) nằm sau chỗ chèn
   S.fixed = new Set([...S.fixed].map(key=>{ const [sid,i]=key.split(':'); return sid===sent.sent_id && +i>=idx ? `${sid}:${+i+n}` : key; }));
   toast(`${sent.sent_id}: thêm ${n} ô □`);
   renderHan(); syncDocStats();
-  select(si, idx, hanUnits([...sent.han].slice(0,idx).join('')).length); // chọn ô □ đầu tiên vừa chèn
+  select(si, idx, hanUnits([...sent.han].slice(0,idx).join('')).length);
 }
 $('#col2').addEventListener('click', e=>{
   const a=e.target.closest('[data-add],[data-fill]'); if(!a || S.mode!=='han') return;
@@ -350,7 +338,6 @@ $('#col2').addEventListener('click', e=>{
   if (a.dataset.add!==undefined) insertMissing(+a.dataset.add, 1, false);
   else { const si=+a.dataset.fill, n=sylsOf(si).length-hanUnits(S.doc.sents[si].han).length; if(n>0) insertMissing(si, n, true); }
 }, true);
-// cập nhật âm dưới các ô chữ của một câu tại chỗ (không dựng lại thẻ để không mất focus / click đang dở)
 function updateCellSyls(si){
   const cells=document.querySelectorAll(`#col2 .cell[data-si="${si}"]`);
   cells.forEach(el=>{ const syl=sylOf(si,+el.dataset.k); el.querySelector('.s').textContent=syl||'·'; el.title=syl; el.classList.remove('bad'); });
@@ -362,7 +349,7 @@ async function markBadCells(cells){
     const ch=[...S.doc.sents[+el.dataset.si].han][+el.dataset.i]; if (ch==='□') continue;
     const syl=sylOf(+el.dataset.si, +el.dataset.k); if (!syl) continue;
     const info=await charInfo(ch);
-    if (syl!==sylOf(+el.dataset.si, +el.dataset.k)) continue; // âm đã đổi trong lúc chờ
+    if (syl!==sylOf(+el.dataset.si, +el.dataset.k)) continue;
     if (!info.syls.some(y=>sylKey(y)===sylKey(syl))) { el.classList.add('bad'); el.title=`${syl} — từ điển: ${info.syls.join(', ')||'(không có)'}`; }
   }
 }
@@ -432,7 +419,6 @@ async function pick(ch){
   if (before==='□' && ch!=='□') gotoNextMiss(); else select(s.si,s.i,s.k);
 }
 
-// ---------- col 3: ảnh ----------
 function loadImage(){
   const img=$('#img');
   img.onload=()=>{ const ov=$('#ov'); ov.setAttribute('width',img.naturalWidth); ov.setAttribute('height',img.naturalHeight); ov.setAttribute('viewBox',`0 0 ${img.naturalWidth} ${img.naturalHeight}`); fit(); drawBoxes(); };
@@ -440,7 +426,6 @@ function loadImage(){
   $('#imgHan').style.borderColor = S.img==='han'?'var(--accent)':''; $('#imgViet').style.borderColor = S.img==='viet'?'var(--accent)':'';
 }
 const boxes = () => (S.doc && S.doc.boxes[S.img]) || [];
-// nới khung OCR ra ngoài để viền không đè lên dấu thanh / nét chữ
 function padPoly(pts){
   const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   const cx=xs.reduce((a,b)=>a+b)/xs.length, cy=ys.reduce((a,b)=>a+b)/ys.length;
@@ -452,9 +437,6 @@ function drawBoxes(){
   $('#ov').innerHTML=boxes().map((b,n)=>`<polygon points="${padPoly(b.points).map(p=>p.join(',')).join(' ')}"><title>${esc(b.transcription)}</title></polygon>`).join('');
   highlightBox();
 }
-// Tìm vị trí chữ đang chọn trên ảnh Hán THEO THỨ TỰ, không theo nội dung chữ:
-// chữ thứ N của văn bản (đếm nối tiếp qua các câu) -> chữ Hán thứ N trên ảnh, đếm lần lượt qua các khung OCR
-// theo thứ tự đọc trong Label.txt. Chữ trong ảnh có bị OCR sai/khác TSV thì ô đỏ vẫn đứng đúng vị trí.
 function locateChar(){
   const sents=S.doc.sents;
   let g=S.sel.k;
@@ -462,30 +444,27 @@ function locateChar(){
   let best=null, seen=0;
   boxes().some((b,n)=>{
     const T=[...b.transcription];
-    const hp=[]; T.forEach((c,p)=>{ if(isHan(c)||c==='□') hp.push(p); }); // vị trí các chữ Hán trong dòng
+    const hp=[]; T.forEach((c,p)=>{ if(isHan(c)||c==='□') hp.push(p); });
     if(g < seen+hp.length){ best={n, q:hp[g-seen], L:T.length}; return true; }
     seen+=hp.length; return false;
   });
-  if(!best) return null; // vị trí vượt quá số chữ đọc được trên ảnh
-  // Khung OCR là tứ giác (có thể nghiêng): lấy 2 cạnh ngắn làm hai đầu dòng, nội suy dọc theo 2 cạnh dài.
+  if(!best) return null;
   const P=boxes()[best.n].points, d=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-  let A,B; // A = đầu dòng, B = cuối dòng; A[i] nối với B[i] bằng cạnh dài
+  let A,B;
   if (d(P[0],P[1]) < d(P[1],P[2])) { A=[P[0],P[1]]; B=[P[3],P[2]]; } else { A=[P[1],P[2]]; B=[P[0],P[3]]; }
   const mid=e=>[(e[0][0]+e[1][0])/2,(e[0][1]+e[1][1])/2], ma=mid(A), mb=mid(B);
   const vertical = Math.abs(mb[1]-ma[1]) >= Math.abs(mb[0]-ma[0]);
-  if (vertical ? ma[1]>mb[1] : ma[0]>mb[0]) [A,B]=[B,A]; // cột: trên -> dưới; dòng ngang: trái -> phải
+  if (vertical ? ma[1]>mb[1] : ma[0]>mb[0]) [A,B]=[B,A];
   const lerp=(p,q,t)=>[p[0]+(q[0]-p[0])*t, p[1]+(q[1]-p[1])*t];
   const t0=best.q/best.L, t1=(best.q+1)/best.L;
   const quad=[lerp(A[0],B[0],t0), lerp(A[1],B[1],t0), lerp(A[1],B[1],t1), lerp(A[0],B[0],t1)];
   const cx=quad.reduce((s,p)=>s+p[0],0)/4, cy=quad.reduce((s,p)=>s+p[1],0)/4;
-  // khung OCR đã được nới sẵn (unclip): thu ngang còn 80%, nới dọc theo dòng 15% cho khỏi đè nét
   const L=Math.hypot(mb[0]-ma[0], mb[1]-ma[1])||1, ux=(mb[0]-ma[0])/L, uy=(mb[1]-ma[1])/L;
   return quad.map(([x,y])=>{ const dx=x-cx, dy=y-cy, a=dx*ux+dy*uy, p=-dx*uy+dy*ux, A=a*1.15, Pp=p*0.8;
     return [Math.round(cx+A*ux-Pp*uy), Math.round(cy+A*uy+Pp*ux)]; });
 }
 function highlightBox(){
   document.querySelectorAll('#ov .charhit').forEach(r=>r.remove());
-  // Chỉ khoanh ở chế độ chữ Hán, và khoanh đúng một chữ. Ảnh Việt (sửa phiên âm / dịch nghĩa) không khoanh.
   if(!S.doc || S.img!=='han' || S.mode!=='han' || !S.sel) return;
   const q=locateChar(); if(!q) return;
   $('#ov').insertAdjacentHTML('beforeend', `<polygon class="charhit" points="${q.map(p=>p.join(',')).join(' ')}"></polygon>`);
@@ -500,7 +479,7 @@ function centerOn(pts){
   const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
   const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
   const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
-  if (S.z.s<=fitScale()*1.01) S.z.s=Math.max(fitScale(), Math.min(v.clientWidth*0.95/w, v.clientHeight*0.95/h, fitScale()*3)); // tự phóng khi đang ở chế độ vừa khung
+  if (S.z.s<=fitScale()*1.01) S.z.s=Math.max(fitScale(), Math.min(v.clientWidth*0.95/w, v.clientHeight*0.95/h, fitScale()*3));
   S.z.x=v.clientWidth/2-cx*S.z.s; S.z.y=v.clientHeight/2-cy*S.z.s; apply();
 }
 const view=$('#view');
@@ -516,7 +495,6 @@ $('#imgHan').onclick=()=>{S.img='han';loadImage();};
 $('#imgViet').onclick=()=>{S.img='viet';loadImage();};
 window.addEventListener('resize',fit);
 
-// ---------- header / phím ----------
 $('#docSel').onchange=e=>loadDoc(e.target.value);
 $('#prevDoc').onclick=()=>stepDoc(-1); $('#nextDoc').onclick=()=>stepDoc(1);
 $('#onlyTodo').onchange=renderDocSel;
@@ -525,7 +503,7 @@ window.addEventListener('beforeunload', e=>{ if(document.querySelector('#col2 te
 document.addEventListener('keydown',async e=>{
   if (S.mode==='pa_dn') {
     const t=e.target.closest?.('textarea');
-    if (e.ctrlKey && e.key==='Enter') { // lưu + duyệt + sang câu chưa duyệt kế tiếp
+    if (e.ctrlKey && e.key==='Enter') {
       e.preventDefault(); const si=S.act;
       if(!(await saveCard(si))) return;
       if(!S.doc.sents[si].review.pa_dn) await toggleReview(si);
@@ -537,7 +515,7 @@ document.addEventListener('keydown',async e=>{
     return;
   }
   const ta=e.target.closest?.('textarea[data-f="phien_am"]');
-  if (ta) { // ô phiên âm ở chế độ chữ Hán: Enter lưu (rời ô -> focusout lưu), Esc hoàn tác
+  if (ta) {
     if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); }
     else if (e.key==='Escape') { const s=S.doc.sents[+ta.dataset.si]; ta.value=s.phien_am; ta.dispatchEvent(new Event('input',{bubbles:true})); ta.blur(); }
     return;
@@ -549,11 +527,11 @@ document.addEventListener('keydown',async e=>{
   else if (e.key==='v'||e.key==='V') { if(S.sel) toggleReview(S.sel.si); }
   else if (e.key==='['){ shift(-1); } else if (e.key===']'){ shift(1); }
   else if (e.key === 'Delete') {
-    pick(''); // Xóa hẳn chữ
+    pick('');
     e.preventDefault();
 }
 else if (e.key === 'Backspace') {
-    pick('□'); // Đưa về ô thiếu
+    pick('□');
     e.preventDefault();
 }
   else if (/^[1-9]$/.test(e.key)){ const c=S.cands[+e.key-1]; if(c) pick(c.ch); }

@@ -23,8 +23,6 @@ from ..common.text import MISSING, syl_key
 SIMILAR_DICT = Path(__file__).resolve().parents[3] / "guideline" / "dict" / "SinoNom_Similar_Dic_v2.xlsx"
 MAU_TSV = Path(__file__).resolve().parents[3] / "guideline" / "mau_du_lieu" / "MAU_parallel.tsv"
 MAX_N = 4
-# Cụm từ chỉ dùng khi MỌI lần gặp trong sách/mẫu đều viết cùng một kiểu: sách viết nhiều kiểu (dị thể)
-# thì không chọn theo số đông (mục 3: giữ đúng chữ của bản gốc).
 MIN_SHARE = 1.0
 
 

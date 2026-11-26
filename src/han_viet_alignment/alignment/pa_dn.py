@@ -63,7 +63,7 @@ def align_sentences(pa: list[str], dn: list[str]) -> list[tuple[list[int], list[
                 s = dp[i][j] + _score(" ".join(pa[i:ii]), " ".join(dn[j:jj]), ratio) - pen
                 if s > dp[ii][jj]:
                     dp[ii][jj], bt[ii][jj] = s, (a, b)
-    if dp[m][n] == NEG:  # không phủ được bằng các hạt cho phép (vd 1 câu PA, 5 câu dịch): gộp hết
+    if dp[m][n] == NEG:
         return [(list(range(m)), list(range(n)))]
     beads = []
     i, j = m, n

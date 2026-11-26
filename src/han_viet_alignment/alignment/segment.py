@@ -8,13 +8,10 @@ from ..common.text import syllables
 _PA_END = re.compile(r"(?<=[.!?])[\"'”’)\]]*\s+")
 _DN_END = re.compile(r"(?<=[.!?;])[\"'”’)\]]*\s+")
 _CLOSING = re.compile(r"^(kh[âa]m\s+tai|kính\s+(cẩn\s+)?thay)\b", re.I)
-# Công thức luôn mở đầu câu trong sắc phong: tách tại đó khi OCR làm mất dấu câu trước nó
-# (vd 'chi thần Hướng lai...', 'tự điền Khâm tai!', 'Kính cẩn thay Ngày 9 tháng...'). Chỉ tách khi
-# chữ liền trước không có dấu câu; dạng viết thường chỉ dùng cho công thức không bao giờ đứng giữa câu.
 _PA_START = re.compile(r"(?<=\w)\s+(?=(?:(?i:hướng\s+lai|tứ\s+kim|khâm\s+tai)|Hộ\s+quốc|HỘ\s+QUỐC|Nhưng\s+chuẩn)\b)")
 _DN_START = re.compile(r"(?<=\w)\s+(?=(?:Từ\s+trước\s+tới\s+nay|Nay\s+trẫm|Lại\s+chuẩn|Kính\s+cẩn\s+thay|"
                        r"Trong\s+việc\s+giúp\s+nước|Ngày\s+(?:\d|mồng|mùng))\b)")
-_SHORT = 3  # mảnh viết thường chỉ là phần tiếp của câu trước khi câu trước ≤ 3 âm tiết ('Thần nguyên. được…')
+_SHORT = 3
 
 
 def _split(text: str, pattern: re.Pattern, starts: re.Pattern | None = None) -> list[str]:
@@ -34,9 +31,6 @@ def _starts_lower(s: str) -> bool:
 
 
 def _merge_fragments(parts: list[str], merge_short_header: bool) -> list[str]:
-    # 1) Mảnh viết thường sau câu rất ngắn là phần tiếp của câu trước (dấu chấm do OCR hoặc viết tắt).
-    #    Sau câu dài thì vẫn là câu mới (OCR hay mất chữ hoa: '...chi thần. nguyên tặng...'); tách nhỏ an toàn
-    #    hơn gộp vì bước dóng hàng tự gộp 1–2/2–1 khi cần. Mảnh ≤ 2 âm tiết viết thường (rác OCR) cũng gộp lùi.
     out: list[str] = []
     for p in parts:
         if out and _starts_lower(p) and (len(syllables(out[-1])) <= _SHORT or len(syllables(p)) <= 2):
@@ -45,7 +39,6 @@ def _merge_fragments(parts: list[str], merge_short_header: bool) -> list[str]:
             out.append(p)
     if not merge_short_header:
         return out
-    # 2) Tiêu đề 1–2 âm tiết ('Sắc.', 'Chiếu.') gộp vào câu sau (kiểu n–1 như MAU.001.1)
     merged: list[str] = []
     carry = ""
     for p in out:

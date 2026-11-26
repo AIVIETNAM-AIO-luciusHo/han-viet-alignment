@@ -31,22 +31,18 @@ def extract_page_images(pdf_path: str, output_dir: str, start_page: int = 1, end
         page_num = page_idx + 1
         page = reader.pages[page_idx]
         
-        # Kiểm tra XObject trong resources
         if "/Resources" in page and "/XObject" in page["/Resources"]:
             xobjects = page["/Resources"]["/XObject"].get_object()
             img_found = False
             for obj_name in xobjects.keys():
                 obj = xobjects[obj_name]
                 if obj.get("/Subtype") == "/Image":
-                    # Lấy kích thước
                     width = int(obj.get("/Width", 0))
                     height = int(obj.get("/Height", 0))
                     
-                    # Tên file ảnh theo chuẩn số trang 3 chữ số
                     img_name = f"page_{page_num:03d}.jpg"
                     img_path = output_dir / img_name
                     
-                    # Trích xuất dữ liệu ảnh
                     raw_data = obj.get_data()
                     with open(img_path, "wb") as f:
                         f.write(raw_data)
@@ -58,7 +54,7 @@ def extract_page_images(pdf_path: str, output_dir: str, start_page: int = 1, end
                         "height": height
                     })
                     img_found = True
-                    break # Mỗi trang sách scan thường chỉ có 1 ảnh nền chính
+                    break
             
             if not img_found:
                 print(f"[!] Cảnh báo: Trang {page_num} không tìm thấy đối tượng Image.")

@@ -54,6 +54,12 @@ class CleaningTests(unittest.TestCase):
         self.assertEqual(s, "Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846)")
         self.assertEqual(clean_dich_nghia("Nay thân hãy phù hộ cho xã."), "Nay thân hãy phù hộ cho xã.")
 
+    def test_place_note_mid_text_keeps_following_sentence(self):
+        s = clean_dich_nghia("Sắc phong cho thần. Nay là thôn Xích Đằng, phường Lam Sơn, thành phố Hưng Yên. "
+                             + "Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846). " + "Kính cẩn thay! " * 12)
+        self.assertNotIn("thôn Xích Đằng", s)
+        self.assertIn("Ngày mùng 9 tháng 10 niên hiệu Thiệu Trị thứ 6 (1846)", s)
+
     def test_dich_nghia_keeps_age(self):
         self.assertEqual(clean_dich_nghia("mừng trẫm sinh nhật tròn 40 tuổi, ban chiếu báu"),
                          "mừng trẫm sinh nhật tròn 40 tuổi, ban chiếu báu")

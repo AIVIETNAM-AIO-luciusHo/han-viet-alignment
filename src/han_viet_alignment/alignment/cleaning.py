@@ -100,9 +100,31 @@ def clean_phien_am(text: str, readings: Readings | None = None, keep_upper: bool
     return _space_punct(" ".join(tokens))
 
 
+_NOTE_TAIL_MAX = 150
+_NEXT_SENTENCE = re.compile(r"[.!?]\s+(?=[A-ZÀ-ỸĐ])")
+
+
 def strip_place_notes(s: str) -> str:
-    """Bỏ chú thích địa danh hiện đại ('Nay là thôn …') khỏi dịch nghĩa."""
-    return re.sub(r"\s+", " ", _PLACE_NOTE.sub(" ", s)).strip()
+    """Bỏ chú thích địa danh hiện đại ('Nay là thôn …') khỏi dịch nghĩa.
+
+    Chú thích nằm cuối trang nên đuôi ngắn thì bỏ hết; đuôi dài (chú thích giữa văn bản) chỉ bỏ đến hết câu để
+    không mất phần dịch phía sau.
+    """
+    out, pos = [], 0
+    while True:
+        m = _PLACE_NOTE.search(s, pos)
+        if not m:
+            break
+        out.append(s[pos:m.start()])
+        tail = s[m.start():]
+        if len(tail) <= _NOTE_TAIL_MAX:
+            pos = len(s)
+            break
+        nxt = _NEXT_SENTENCE.search(tail)
+        pos = m.start() + nxt.end() if nxt else len(s)
+        out.append(" ")
+    out.append(s[pos:])
+    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
 def clean_dich_nghia(text: str, readings: Readings | None = None) -> str:

@@ -6,6 +6,7 @@ Máy chỉ tạo **bản nháp** — người phải kiểm tra lại trước k
 ```text
 PDF ─► ocr_tho.py ─► dong_hang.py (sắc phong)          ─► sửa tay ─► kiểm tra ─► nộp
                      dong_hang_minh_menh.py (Minh Mệnh)
+text song ngữ có sẵn ─► dong_hang_song_ngu.py (Tư trị thông giám, …)
 ```
 
 Mọi lệnh chạy **từ thư mục gốc repo** trên PowerShell. macOS/Linux: thay `.\venv\Scripts\python.exe` bằng `venv/bin/python`.
@@ -95,6 +96,30 @@ Lỗi ước lượng tính trên mẫu nhỏ do mô hình AI chấm (`docs/danh
 
 Kết quả: `R1204/04_dong_hang/R1204_parallel.tsv` + `.xlsx` và `workspace/R1204/review_minh_menh.tsv`
 (xem trước các cặp có cờ `RANH_GIOI_SAT_NGUONG`).
+
+### Text song ngữ đã có sẵn (vd Tư trị thông giám R13128–R13130 — không phiên âm)
+Dùng khi đã có **hai file text sạch**: một file chữ Hán, một file bản dịch, **mỗi dòng (không rỗng) là một đoạn**
+và đoạn bên Hán đi theo đúng thứ tự đoạn bên Việt (dòng trống giữa các đoạn không sao).
+Đặt 2 file vào **một thư mục con bất kỳ** của thư mục sách; tên file phải có `han` và `viet` (hoặc `dich_nghia`):
+```text
+R13128/
+└── data/                 ← tên thư mục con tùy ý
+    ├── 128.han.txt
+    └── 128.viet.txt
+```
+Script tự tìm, chép sang `R13128/03_text_sach/han.txt` + `dich_nghia.txt` (theo hợp đồng dữ liệu) rồi dóng hàng.
+Muốn chỉ rõ file thì dùng `--han` / `--viet`.
+```powershell
+.\venv\Scripts\python.exe dong_hang_song_ngu.py --ma-sach R13128
+.\venv\Scripts\python.exe dong_hang_song_ngu.py --ma-sach R13128 --force      # chạy lại (mất bản sửa tay)
+.\venv\Scripts\python.exe dong_hang_song_ngu.py --ma-sach R13128 --sync xlsx  # sau khi sửa tay file Excel
+```
+Script dóng đoạn ↔ đoạn rồi câu ↔ câu (cắt câu tại `。！？` / `. ! ?`). Mốc khớp là âm Hán-Việt của tên người,
+địa danh, chức quan, can chi, tra trong từ điển `guideline/dict/`. Dòng tiêu đề dính Hán + Việt trong bản dịch
+(`二年Năm Hiếu Kiến thứ 2`) được tách thành một cặp riêng. Mỗi nhóm đoạn là một `doc_id`.
+
+Kết quả: `R13128/04_dong_hang/R13128_parallel.tsv` + `.xlsx` và `workspace/R13128/review_song_ngu.tsv`
+(cột `kieu` = số câu Hán : số câu Việt; cờ `KHONG_MOC`, `LECH_DO_DAI`, `GOP_a:b` để xem trước).
 
 ---
 
